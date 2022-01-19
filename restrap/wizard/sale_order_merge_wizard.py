@@ -57,7 +57,7 @@ class SaleOrderMergeWizardLine(models.TransientModel):
     _name = 'sale.order.merge.wizard.line'
 
     wizard_id = fields.Many2one('sale.order.merge.wizard', string="Wizard")
-    product_id = fields.Many2one('product.product', string="Product", readonly=True)
+    product_id = fields.Many2one('product.product', string="Product", required=True)
     product_qty = fields.Float(string="Combined Quantity")
     date_planned_start = fields.Datetime(string="Scheduled Date")
     split = fields.Boolean(string="Split Manufacture Order")
