@@ -62,4 +62,3 @@ class SaleOrderMergeWizardLine(models.TransientModel):
     date_planned_start = fields.Datetime(string="Scheduled Date")
     split = fields.Boolean(string="Split Manufacture Order")
     reference = fields.Selection([('a', 'A'), ('b', 'B'), ('c', 'C')], string="Reference")
-
