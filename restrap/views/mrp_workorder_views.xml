@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--Gantt View-->
+    <record id="workcenter_line_gantt_production_inherit" model="ir.ui.view">
+        <field name="name">mworkcenter.line.gantt.production.inherit</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.mrp_workorder_view_gantt"/>
+        <field name="arch" type="xml">
+            <xpath expr="//gantt" position="attributes">
+                <attribute name="color">split_order_id</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
