@@ -4,7 +4,7 @@
     "version": "15.0.1",
     "author": "Smart IT Ltd",
     "category": "Other",
-    "summary": "Zelus",
+    "summary": "Restrap Smart IT Developments",
     'description': "Custom module for Restrap developed by Smart IT Ltd",
     'maintainer': "Smart IT Ltd",
     'website': 'smart-ltd.co.uk',
@@ -14,5 +14,6 @@
         'views/res_config_settings_view.xml',
         'views/mrp_production_views.xml',
         'views/mrp_workorder_views.xml',
+        'views/product_views.xml'
     ],
 }
