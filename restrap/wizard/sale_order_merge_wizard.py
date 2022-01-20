@@ -14,9 +14,17 @@ class SaleOrderMergeWizard(models.TransientModel):
         active_ids = self._context.get('active_ids', [])
         orders = self.env['sale.order'].browse(active_ids)
         already_merged_orders = orders.filtered(lambda o: o.merged)
+        unconfirmed_orders = orders.filtered(lambda o: o.state != 'sale')
+        # Restriction: Check if any order in not in "Sale Order" state
+        if unconfirmed_orders:
+            raise UserError("Only confirmed Sales Orders can be merged."
+                            " Please confirm the following orders to proceed. \n %s" %
+                            ", ".join(unconfirmed_orders.mapped("name")))
+        # Restriction: check if any order is merged before
         if already_merged_orders:
             raise UserError("The following Sales Order(s) are already merged. \n %s" %
                             ", ".join(already_merged_orders.mapped("name")))
+
         order_lines = orders.mapped('order_line')
         products = order_lines.mapped('product_id').filtered(lambda p: p.type in ['product', 'consu'])
         product_list = []
@@ -30,6 +38,7 @@ class SaleOrderMergeWizard(models.TransientModel):
         res.update({'order_ids': orders.ids, 'line_ids': product_list})
         return res
 
+    # On wizard confirmation, system will create a MO for each line
     def action_confirm(self):
         for line in self.line_ids:
             if not line.date_planned_start:
@@ -48,6 +57,7 @@ class SaleOrderMergeWizard(models.TransientModel):
             order._onchange_move_raw()
             order._onchange_workorder_ids()
             order._onchange_product_qty()
+            # Check if split option is checked and call action_split() in mrp.production
             if line.split:
                 order.action_spilt()
         self.order_ids.write({'merged': True})
