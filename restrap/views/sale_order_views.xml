@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Form View -->
+    <record id="sale_order_form_inherit_view" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.view</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='tag_ids']" position="after">
+                <field name="merged"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List View -->
+    <record id="sale_order_tree_inherit_view" model="ir.ui.view">
+        <field name="name">sale.order.reee.inherit.view</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="attributes">
+                <attribute name="decoration-primary">merged</attribute>
+            </xpath>
+            <xpath expr="//field[@name='activity_ids']" position="after">
+                <field name="merged"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
