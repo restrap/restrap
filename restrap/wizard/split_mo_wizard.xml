@@ -18,7 +18,6 @@
     <record id="action_confirm_mo_spilt_wizard" model="ir.actions.act_window">
         <field name="name">Confirm</field>
         <field name="res_model">mrp.production.split.wizard</field>
-        <field name="binding_model_id" ref="mrp.model_mrp_production"/>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
