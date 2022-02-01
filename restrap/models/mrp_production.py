@@ -35,16 +35,14 @@ class MrpProduction(models.Model):
         values = [unit_per_mo]
         while remaining_qty > 0:
             product_qty = unit_per_mo if remaining_qty > unit_per_mo else remaining_qty
-            if product_qty <= 0:
-                raise UserError(product_qty)
-            remaining_qty -= unit_per_mo
+            remaining_qty -= product_qty
             values.append(product_qty)
 
-        self._split_orders({self: values})
+        self._split_orders({self: values}, unit_per_mo)
 
         self.write({'mrp_split_done': True})
 
-    def _split_orders(self, amounts):
+    def _split_orders(self, amounts, unit_per_mo):
         """ Splits productions into productions smaller quantities to produce, i.e. creates
         its backorders. Same functionaloty as _split_productions()
         :param dict amounts: a dict with a production as key and a list value containing
@@ -53,35 +51,52 @@ class MrpProduction(models.Model):
         and a new backorder with product_qty=2.
         """
 
-        def _default_amounts(production):
-            return [production.qty_producing, production._get_quantity_to_backorder()]
-
         backorder_vals_list = []
         initial_qty_by_production = {}
-
+        split_qty = 0
         # Create the backorders.
         for production in self:
             initial_qty_by_production[production] = production.product_qty
-
             production.name = self._get_name_backorder(production.name, production.backorder_sequence)
             production.product_qty = amounts[production][0]
-            backorder_vals = production.copy_data(default=production._get_backorder_mo_vals())[0]
+            split_qty += production.product_qty
+            backorder_vals = production.copy_data()[0]
             backorder_qtys = amounts[production][1:]
 
             for qty_to_backorder in backorder_qtys:
                 backorder_vals_list.append(dict(
                     backorder_vals,
-                    product_qty=qty_to_backorder,
-                    name=False
+                    product_qty=qty_to_backorder
                 ))
 
         backorders = self.env['mrp.production'].create(backorder_vals_list)
+
+        # Handle remaining qty after rounding
+        for backorder in backorders:
+            split_qty += backorder.product_qty
+        remaining_qty = initial_qty_by_production[production] - split_qty
+        remaining_backorder_qty = []
+        while remaining_qty > 0:
+            product_qty = unit_per_mo if remaining_qty > unit_per_mo else remaining_qty
+            remaining_qty -= product_qty
+            remaining_backorder_qty.append(product_qty)
+
+        remaining_backorder_vals_list = []
+        for qty_to_backorder in remaining_backorder_qty:
+            remaining_backorder_vals_list.append(dict(
+                backorder_vals,
+                product_qty=qty_to_backorder
+            ))
+        remaining_backorders = self.env['mrp.production'].create(remaining_backorder_vals_list)
+
+        backorders |= remaining_backorders
+
 
         index = 0
         production_to_backorders = {}
         production_ids = OrderedSet()
         for production in self:
-            number_of_backorder_created = len(amounts.get(production, _default_amounts(production))) - 1
+            number_of_backorder_created = len(backorders)
             production_backorders = backorders[index:index + number_of_backorder_created]
             production_to_backorders[production] = production_backorders
             production_ids.update(production.ids)
