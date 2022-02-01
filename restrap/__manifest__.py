@@ -13,6 +13,7 @@
         'security/mrp_security.xml',
         'security/ir.model.access.csv',
         'wizard/sale_order_merge_wizard.xml',
+        'wizard/split_mo_wizard.xml',
         'views/res_config_settings_view.xml',
         'views/mrp_production_views.xml',
         'views/mrp_workorder_views.xml',

@@ -8,8 +8,7 @@
             <xpath expr="//header/button[@name='action_confirm']" position="after">
                 <field name="allow_mrp_split" invisible="1"/>
                 <field name="mrp_split_done" invisible="1"/>
-                <button name="action_spilt" type="object" string="Split" class="oe_highlight"
-                        confirm="Confirming this action will split this manufacture order."
+                <button name="%(action_confirm_mo_spilt_wizard)d" type="action" string="Split" class="oe_highlight"
                         attrs="{'invisible': ['|', '|', ('state', '!=', 'draft'), ('allow_mrp_split', '=', False), ('mrp_split_done', '=', True)]}"/>
             </xpath>
             <xpath expr="//field[@name='user_id']" position="after">
