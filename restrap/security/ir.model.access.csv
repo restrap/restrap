@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 sale_order_merge_wizard,sale.order.merge.wizard,model_sale_order_merge_wizard,base.group_user,1,1,1,1
 sale_order_merge_wizard_line,sale.order.merge.wizard.line,model_sale_order_merge_wizard_line,base.group_user,1,1,1,1
+mrp_production_split_wizard,mrp.production.split.wizard,model_mrp_production_split_wizard,base.group_user,1,1,1,1

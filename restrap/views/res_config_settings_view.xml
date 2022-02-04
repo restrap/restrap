@@ -11,9 +11,9 @@
                         <field name="mrp_split"/>
                     </div>
                     <div class="o_setting_right_pane">
-                        <label for="mrp_split" string="Manufacturing Order Split Duration"/>
+                        <label for="mrp_split" string="Manufacture Order Split Duration"/>
                         <div class="text-muted" attrs="{'invisible': [('mrp_split','=',False)]}">
-                            Enter a full duration a manufacture order should be before it split
+                            Enter the full duration a manufacture order should be before it is split
                         </div>
                         <div class="content-group" attrs="{'invisible': [('mrp_split','=',False)]}">
                             <div class="mt8">

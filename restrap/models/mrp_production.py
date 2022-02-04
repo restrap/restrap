@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
+from collections import defaultdict
+import datetime
 
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 from odoo.addons.mrp.models.mrp_production import MrpProduction
-import datetime
+from odoo.tools import float_compare, float_round, float_is_zero, format_datetime
+from odoo.tools.misc import OrderedSet, format_date
 
 
 class MrpProduction(models.Model):
@@ -20,32 +23,130 @@ class MrpProduction(models.Model):
         if not bom:
             return
         split_duration = self.company_id.mrp_split_duration
-        # Expected duration calculated from BoM
-        unit_duration = sum(line.time_cycle for line in bom.operation_ids)
-        unit_per_mo = split_duration / unit_duration
-        mo_total_duration = unit_duration * self.product_qty
-        # Check if the current MO duration is less than split duration
-        if mo_total_duration <= unit_per_mo:
+        # Expected duration calculated from Work Orders
+        total_duration = sum(line.duration_expected for line in self.workorder_ids)
+        # Check if the  MO duration is less than split duration
+        if total_duration <= split_duration:
             raise UserError(_("Unable to split the MO as the duration is less than split duration"))
-        # Subtract current mo qty and update duration
-        remaining_qty = self.product_qty - unit_per_mo
-        self.product_qty = unit_per_mo
-        self.workorder_ids.write({'split_order_id': self.id})
-        self._onchange_product_qty()
+        unit_duration = total_duration / self.product_qty
+        unit_per_mo = split_duration / unit_duration
 
-        # Split the remaining qty
-        while remaining_qty > unit_per_mo or remaining_qty > 0:
+        remaining_qty = self.product_qty - unit_per_mo
+        values = [unit_per_mo]
+        while remaining_qty > 0:
             product_qty = unit_per_mo if remaining_qty > unit_per_mo else remaining_qty
-            remaining_qty -= unit_per_mo
-            order = self.copy({'product_qty': product_qty})
-            order._onchange_product_qty()
-            order.workorder_ids.write({'split_order_id': self.id})
-            refs = ["<a href=# data-oe-model=mrp.production data-oe-id=%s>%s</a>" % tuple(name_get) for name_get in
-                    self.name_get()]
-            message = _("This order has been created from: %s") % ','.join(refs)
-            order.message_post(body=message)
+            remaining_qty -= product_qty
+            values.append(product_qty)
+
+        self._split_orders({self: values}, unit_per_mo)
 
         self.write({'mrp_split_done': True})
+
+    def _split_orders(self, amounts, unit_per_mo):
+        """ Splits productions into productions smaller quantities to produce, i.e. creates
+        its backorders. Same functionaloty as _split_productions()
+        :param dict amounts: a dict with a production as key and a list value containing
+        the amounts each production split should produce including the original production,
+        e.g. {mrp.production(1,): [3, 2]} will result in mrp.production(1,) having a product_qty=3
+        and a new backorder with product_qty=2.
+        """
+
+        backorder_vals_list = []
+        initial_qty_by_production = {}
+        split_qty = 0
+        # Create the backorders.
+        for production in self:
+            initial_qty_by_production[production] = production.product_qty
+            production.name = self._get_name_backorder(production.name, production.backorder_sequence)
+            production.product_qty = amounts[production][0]
+            split_qty += production.product_qty
+            backorder_vals = production.copy_data()[0]
+            backorder_qtys = amounts[production][1:]
+
+            for qty_to_backorder in backorder_qtys:
+                backorder_vals_list.append(dict(
+                    backorder_vals,
+                    product_qty=qty_to_backorder
+                ))
+
+        backorders = self.env['mrp.production'].create(backorder_vals_list)
+
+        # Handle remaining qty after rounding
+        for backorder in backorders:
+            split_qty += backorder.product_qty
+        remaining_qty = initial_qty_by_production[production] - split_qty
+        remaining_backorder_qty = []
+        while remaining_qty > 0:
+            product_qty = unit_per_mo if remaining_qty > unit_per_mo else remaining_qty
+            remaining_qty -= product_qty
+            remaining_backorder_qty.append(product_qty)
+
+        remaining_backorder_vals_list = []
+        for qty_to_backorder in remaining_backorder_qty:
+            remaining_backorder_vals_list.append(dict(
+                backorder_vals,
+                product_qty=qty_to_backorder
+            ))
+        remaining_backorders = self.env['mrp.production'].create(remaining_backorder_vals_list)
+
+        backorders |= remaining_backorders
+
+
+        index = 0
+        production_to_backorders = {}
+        production_ids = OrderedSet()
+        for production in self:
+            number_of_backorder_created = len(backorders)
+            production_backorders = backorders[index:index + number_of_backorder_created]
+            production_to_backorders[production] = production_backorders
+            production_ids.update(production.ids)
+            production_ids.update(production_backorders.ids)
+            index += number_of_backorder_created
+
+        # Split the `stock.move` among new backorders.
+        new_moves_vals = []
+        moves = []
+        for production in self:
+            for move in production.move_raw_ids:
+                if move.additional:
+                    continue
+                unit_factor = move.product_uom_qty / initial_qty_by_production[production]
+                initial_move_vals = move.copy_data()[0]
+                move.product_uom_qty = production.product_qty * unit_factor
+
+                for backorder in production_to_backorders[production]:
+                    move_vals = dict(
+                        initial_move_vals,
+                        product_uom_qty=backorder.product_qty * unit_factor
+                    )
+                    if move.raw_material_production_id:
+                        move_vals['raw_material_production_id'] = backorder.id
+                    else:
+                        move_vals['production_id'] = backorder.id
+                    new_moves_vals.append(move_vals)
+                    moves.append(move)
+        self.env['stock.move'].create(new_moves_vals)
+
+        # We need to adapt `duration_expected` on both the original workorders and their
+        # backordered workorders. To do that, we use the original `duration_expected` and the
+        # ratio of the quantity produced and the quantity to produce.
+        for production in self:
+            initial_qty = initial_qty_by_production[production]
+            bo = production_to_backorders[production]
+
+            # Adapt duration
+            for workorder in (production | bo).workorder_ids:
+                workorder.duration_expected = workorder.duration_expected * workorder.production_id.product_qty / initial_qty
+
+        # Update split order in backorder workorders
+        backorders.mapped('workorder_ids').write({'split_order_id': self.id})
+        # Add original order on split orders chatter
+        refs = ["<a href=# data-oe-model=mrp.production data-oe-id=%s>%s</a>" % tuple(name_get) for name_get in
+                self.name_get()]
+        message = _("This order has been created from: %s") % ','.join(refs)
+        for order in backorders:
+            order.message_post(body=message)
+        return self.env['mrp.production'].browse(production_ids)
 
     def _plan_workorders(self, replan=False):
         """
