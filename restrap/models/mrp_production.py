@@ -60,7 +60,7 @@ class MrpProduction(models.Model):
             production.name = self._get_name_backorder(production.name, production.backorder_sequence)
             production.product_qty = amounts[production][0]
             split_qty += production.product_qty
-            backorder_vals = production.copy_data()[0]
+            backorder_vals = production.copy_data({'move_raw_ids': []})[0]
             backorder_qtys = amounts[production][1:]
 
             for qty_to_backorder in backorder_qtys:
@@ -90,7 +90,6 @@ class MrpProduction(models.Model):
         remaining_backorders = self.env['mrp.production'].create(remaining_backorder_vals_list)
 
         backorders |= remaining_backorders
-
 
         index = 0
         production_to_backorders = {}
