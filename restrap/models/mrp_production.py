@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 from collections import defaultdict
+from curses.ascii import US
 import datetime
 
 from odoo import fields, models, _
@@ -22,7 +23,8 @@ class MrpProduction(models.Model):
         bom = self.bom_id
         if not bom:
             return
-        split_duration = self.company_id.mrp_split_duration
+        # Split duration in minutes
+        split_duration = self.company_id.mrp_split_duration * 60
         # Expected duration calculated from Work Orders
         total_duration = sum(line.duration_expected for line in self.workorder_ids)
         # Check if the  MO duration is less than split duration
