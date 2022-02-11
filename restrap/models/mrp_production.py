@@ -22,14 +22,15 @@ class MrpProduction(models.Model):
         bom = self.bom_id
         if not bom:
             return
-        split_duration = self.company_id.mrp_split_duration
+        # Split duration in minutes
+        split_duration = self.company_id.mrp_split_duration * 60
         # Expected duration calculated from Work Orders
         total_duration = sum(line.duration_expected for line in self.workorder_ids)
         # Check if the  MO duration is less than split duration
         if total_duration <= split_duration:
             raise UserError(_("Unable to split the MO as the duration is less than split duration"))
         unit_duration = total_duration / self.product_qty
-        unit_per_mo = split_duration / unit_duration
+        unit_per_mo = int(split_duration / unit_duration)
 
         remaining_qty = self.product_qty - unit_per_mo
         values = [unit_per_mo]
@@ -60,7 +61,7 @@ class MrpProduction(models.Model):
             production.name = self._get_name_backorder(production.name, production.backorder_sequence)
             production.product_qty = amounts[production][0]
             split_qty += production.product_qty
-            backorder_vals = production.copy_data()[0]
+            backorder_vals = production.copy_data({'move_raw_ids': []})[0]
             backorder_qtys = amounts[production][1:]
 
             for qty_to_backorder in backorder_qtys:
@@ -90,7 +91,6 @@ class MrpProduction(models.Model):
         remaining_backorders = self.env['mrp.production'].create(remaining_backorder_vals_list)
 
         backorders |= remaining_backorders
-
 
         index = 0
         production_to_backorders = {}
