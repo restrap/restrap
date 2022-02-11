@@ -14,6 +14,7 @@
         'views/res_config_settings_view.xml',
         'views/mrp_production_views.xml',
         'views/mrp_workorder_views.xml',
-        'views/product_views.xml'
+        'views/product_views.xml',
+        'views/mrp_routing_workcenter_views.xml'
     ],
 }

@@ -69,8 +69,8 @@ class MrpProduction(models.Model):
             workorder_ids = self.workorder_ids.filtered(lambda wo: not wo.date_planned_start)
         for workorder in workorder_ids:
             # If product contains alternative sewing teams then use those as alternative workcenters
-            if workorder.product_id.sewing_teams:
-                workcenters = workorder.workcenter_id | workorder.product_id.sewing_teams
+            if workorder.operation_id.sewing_operation and workorder.product_id.sewing_teams:
+                workcenters = workorder.product_id.sewing_teams
             else:
                 workcenters = workorder.workcenter_id | workorder.workcenter_id.alternative_workcenter_ids
 
