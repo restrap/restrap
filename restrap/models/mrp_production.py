@@ -31,7 +31,7 @@ class MrpProduction(models.Model):
         if total_duration <= split_duration:
             raise UserError(_("Unable to split the MO as the duration is less than split duration"))
         unit_duration = total_duration / self.product_qty
-        unit_per_mo = split_duration / unit_duration
+        unit_per_mo = int(split_duration / unit_duration)
 
         remaining_qty = self.product_qty - unit_per_mo
         values = [unit_per_mo]
