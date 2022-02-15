@@ -21,5 +21,7 @@
         'views/mrp_bom_views.xml',
         'views/product_views.xml',
         'report/mrp_production_templates.xml',
+        'views/product_views.xml',
+        'views/mrp_routing_workcenter_views.xml',
     ],
 }
