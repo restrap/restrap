@@ -51,12 +51,12 @@ class SaleOrderMergeWizard(models.TransientModel):
                 'reference': line.reference,
             })
             order._onchange_product_id()
-            order.product_qty = line.product_qty
             order._onchange_bom_id()
+            order.product_qty = line.product_qty
+            order._onchange_product_qty()
             order._onchange_date_planned_start()
             order._onchange_move_raw()
             order._onchange_workorder_ids()
-            order._onchange_product_qty()
             # Check if split option is checked and call action_split() in mrp.production
             if line.split:
                 order.action_spilt()
