@@ -33,7 +33,6 @@ class MrpProduction(models.Model):
             if estimated_duration > split_duration:
                 raise UserError(_("Unable to split the order. Unit duration is more than split duration."))
             qty_produce = qty
-            
             # If estimated duration is still less than split duraiton
             # a While loop is used to add up min cpactity
             while estimated_duration <= split_duration:
@@ -52,7 +51,7 @@ class MrpProduction(models.Model):
         split_duration = self.company_id.mrp_split_duration * 60
         # Expected duration calculated from BoM
         total_duration = sum(line.duration_expected for line in self.workorder_ids)
-        unit_duration = total_duration / self.product_qty
+        unit_duration = sum(line.time_cycle for line in bom.operation_ids) / bom.product_qty
         # Check if the current MO duration is less than split duration
         if total_duration <= split_duration:
             raise UserError(_("Unable to split the MO as the duration is less than split duration"))
