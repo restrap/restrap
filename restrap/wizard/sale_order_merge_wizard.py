@@ -57,6 +57,7 @@ class SaleOrderMergeWizard(models.TransientModel):
             order._onchange_date_planned_start()
             order._onchange_move_raw()
             order._onchange_workorder_ids()
+            order._onchange_move_finished()
             # Check if split option is checked and call action_split() in mrp.production
             if line.split:
                 order.action_spilt()
