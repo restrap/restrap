@@ -27,7 +27,7 @@ class MrpProduction(models.Model):
             # Get Minimum capacity set on work centers
             min_capacity = min(self.workorder_ids.mapped('workcenter_id.capacity'))
             # Round unit_per_mo to minimum capacity
-            if min_capacity > 1 and self.product_qty > min_capacity:
+            if 1 > min_capacity > self.product_qty:
                 qty = min_capacity * ceil(qty / min_capacity)
             estimated_duration = self._get_estimated_duration(qty)
             if estimated_duration > split_duration:
@@ -64,6 +64,7 @@ class MrpProduction(models.Model):
         self.product_qty = unit_per_mo
         self._onchange_product_qty()
         self._onchange_move_raw()
+        self._onchange_move_finished()
         self.workorder_ids.write({'split_order_id': self.id})
 
         # Split the remaining qty
@@ -73,6 +74,7 @@ class MrpProduction(models.Model):
             order = self.copy({'product_qty': product_qty, 'date_planned_start': self.date_planned_start})
             order._onchange_product_qty()
             order._onchange_move_raw()
+            order._onchange_move_finished()
             order.workorder_ids.write({'split_order_id': self.id})
             refs = ["<a href=# data-oe-model=mrp.production data-oe-id=%s>%s</a>" % tuple(name_get) for name_get in
                     self.name_get()]
