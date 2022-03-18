@@ -40,6 +40,7 @@ class SaleOrderMergeWizard(models.TransientModel):
 
     # On wizard confirmation, system will create a MO for each line
     def action_confirm(self):
+        plan_id = self.env['restrap.mrp.plan'].sudo().create({}).id
         for line in self.line_ids:
             if not line.date_planned_start:
                 raise UserError("Please add scheduled date.")
@@ -58,9 +59,10 @@ class SaleOrderMergeWizard(models.TransientModel):
             order._onchange_move_raw()
             order._onchange_workorder_ids()
             order._onchange_move_finished()
+            order.workorder_ids.write({'restrap_plan_id': plan_id})
             # Check if split option is checked and call action_split() in mrp.production
             if line.split:
-                order.action_spilt()
+                order.with_context(plan_id=plan_id).action_spilt()
         self.order_ids.write({'merged': True})
 
 

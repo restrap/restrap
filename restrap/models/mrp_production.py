@@ -3,7 +3,7 @@
 from collections import defaultdict
 import datetime
 
-from odoo import fields, models, _
+from odoo import fields, models, api, _
 from odoo.exceptions import UserError
 from odoo.addons.mrp.models.mrp_production import MrpProduction
 from odoo.tools import float_round
@@ -44,7 +44,9 @@ class MrpProduction(models.Model):
                     qty_produce += 1
 
             return qty_produce
-
+        plan_id = self._context.get("plan_id", False)
+        if not plan_id:
+            plan_id = self.env['restrap.mrp.plan'].sudo().create({}).id
         bom = self.bom_id
         if not bom:
             return
@@ -65,7 +67,7 @@ class MrpProduction(models.Model):
         self._onchange_product_qty()
         self._onchange_move_raw()
         self._onchange_move_finished()
-        self.workorder_ids.write({'split_order_id': self.id})
+        self.workorder_ids.write({'restrap_plan_id': plan_id})
 
         # Split the remaining qty
         while remaining_qty > unit_per_mo or remaining_qty > 0:
@@ -75,7 +77,7 @@ class MrpProduction(models.Model):
             order._onchange_product_qty()
             order._onchange_move_raw()
             order._onchange_move_finished()
-            order.workorder_ids.write({'split_order_id': self.id})
+            order.workorder_ids.write({'restrap_plan_id': plan_id})
             refs = ["<a href=# data-oe-model=mrp.production data-oe-id=%s>%s</a>" % tuple(name_get) for name_get in
                     self.name_get()]
             message = _("This order has been created from: %s") % ','.join(refs)
@@ -178,3 +180,7 @@ class MrpProduction(models.Model):
     MrpProduction._plan_workorders = _plan_workorders
 
 
+class RestrapMrpPlan(models.Model):
+    _name = 'restrap.mrp.plan'
+    _description = "Restrap Manufacturing Plan"
+    _rec_name = "id"
