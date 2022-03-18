@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="mrp.mrp_workorder_view_gantt"/>
         <field name="arch" type="xml">
             <xpath expr="//gantt" position="attributes">
-                <attribute name="color">split_order_id</attribute>
+                <attribute name="color">restrap_plan_id</attribute>
             </xpath>
         </field>
     </record>
