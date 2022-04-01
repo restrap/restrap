@@ -24,4 +24,5 @@
         'views/product_views.xml',
         'views/mrp_routing_workcenter_views.xml',
     ],
+    'license': 'LGPL-3',
 }
