@@ -1,0 +1,25 @@
+<odoo>
+    <template id="report_mrporder_restrap" inherit_id="mrp.report_mrporder">
+        <xpath expr="//table[@t-if='o.move_raw_ids']" position="after">
+            <h3>
+                <span>Notes</span>
+            </h3>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th style="width: 33.33%;">Cutting</th>
+                        <th style="width: 33.33%;">Sewing</th>
+                        <th style="width: 33.33%;">Packing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="width: 33.33%;"><span t-field="o.bom_id.cutting_notes"/></td>
+                        <td style="width: 33.33%;"><span t-field="o.bom_id.sewing_notes"/></td>
+                        <td style="width: 33.33%;"><span t-field="o.bom_id.packing_notes"/></td>
+                    </tr>
+                </tbody>
+            </table>
+        </xpath>
+    </template>
+</odoo>
