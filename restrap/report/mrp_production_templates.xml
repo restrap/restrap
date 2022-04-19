@@ -21,5 +21,11 @@
                 </tbody>
             </table>
         </xpath>
+        <xpath expr="//span[@t-field='o.user_id']/.." position="after">
+            <div class="col-3" t-id="o.reference">
+                <strong>Reference:</strong><br/>
+                <span t-field="o.reference"/>
+            </div>
+        </xpath>
     </template>
 </odoo>
