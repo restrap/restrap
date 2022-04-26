@@ -7,3 +7,4 @@ from . import sale_order
 from . import mrp_bom
 from . import product_template
 from . import mrp_routing_workcenter
+from . import res_partner
