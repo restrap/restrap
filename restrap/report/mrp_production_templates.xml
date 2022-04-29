@@ -57,9 +57,15 @@
                                     <table class="table table-bordered" style="border: 2px solid black;">
                                         <tr>
                                             <th class="table-active text-center" style="height:2rem;">
-                                                [
-                                                <span t-esc="production.product_id.default_code"/>
-                                                ]
+                                                <t t-if="production.product_id.default_code">
+                                                    [
+                                                    <span t-esc="production.product_id.default_code"/>
+                                                    ]
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="text-muted">No Internal Reference available</span>
+                                                </t>
+
                                                 <br/>
                                             </th>
                                         </tr>
