@@ -290,13 +290,16 @@ class ProductProduct(models.Model):
         else:
             raise ValidationError("Please Check Your Connection or error in application or refresh token..!!")
 
+ACCOUNT_DOMAIN = "['&', '&', '&', ('deprecated', '=', False), ('internal_type','=','other'), ('company_id', '=', current_company_id), ('is_off_balance', '=', False)]"
+
 
 class product_template(models.Model):
     _inherit = "product.template"
 
     xero_product_id = fields.Char('Xero ItemID', related='product_variant_ids.xero_product_id', copy=False)
 
+
 class product_category(models.Model):
     _inherit = "product.category"
 
-    xero_inventory_account = fields.Many2one('account.account', string="XERO Inventory Account",copy=False)
+    xero_inventory_account = fields.Many2one('account.account', company_dependent=True, domain=ACCOUNT_DOMAIN, string="XERO Inventory Account",copy=False)
