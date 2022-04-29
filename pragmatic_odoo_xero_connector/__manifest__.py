@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Xero Integration OAuth 2.0 REST API',
-    'version': '15.0.0',
+    'version': '0.3',
     'category': 'Accounting',
     'author': 'Pragmatic TechSoft Pvt Ltd.',
     'website': "www.pragtech.co.in",
@@ -36,9 +36,9 @@ accounting app
         'views/automated_authentication_scheduler.xml',
         'security/ir.model.access.csv',
     ],
-    #'images': ['static/description/odoo-xero-connector-gif.gif'],
+    'images': ['static/description/odoo-xero-connector-gif.gif'],
     #'images': ['static/description/end-of-year-sale-main.jpg'],
-    'images': ['static/description/end_of_year_sale.gif'],
+    #'images': ['static/description/end_of_year_sale.gif'],
     'live_test_url': 'http://www.pragtech.co.in/company/proposal-form.html?id=103&name=Odoo-xero-Accounting-Management',
     'license': 'OPL-1',
     'price': 299.00,
