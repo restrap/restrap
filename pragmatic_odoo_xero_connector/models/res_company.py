@@ -747,7 +747,7 @@ class ResCompany(models.Model):
             if item.get('SalesDetails').get('TaxType', False):
                 product_tax_s = self.env['account.tax'].search(
                     [('xero_tax_type_id', '=', item.get('SalesDetails').get('TaxType')), ('type_tax_use', '=', 'sale'),
-                     ('price_include', '=', False), ('company_id', '=', self.id)])
+                     ('price_include', '=', False), ('company_id', '=', self.id)], limit=1)
                 if product_tax_s:
                     dict_create.update(
                         {'taxes_id': [(6, 0, [product_tax_s.id])]})
@@ -779,7 +779,7 @@ class ResCompany(models.Model):
             if item.get('PurchaseDetails').get('TaxType', False):
                 product_tax_p = self.env['account.tax'].search(
                     [('xero_tax_type_id', '=', item.get('PurchaseDetails').get('TaxType')),
-                     ('type_tax_use', '=', 'purchase'), ('price_include', '=', False), ('company_id', '=', self.id)])
+                     ('type_tax_use', '=', 'purchase'), ('price_include', '=', False), ('company_id', '=', self.id)], limit=1)
 
                 if product_tax_p:
                     dict_create.update(
@@ -3148,7 +3148,10 @@ class ResCompany(models.Model):
             dict_i['company_id'] = self.id
 
         if cust.get('CurrencyCode'):
-            currency = self.env['res.currency'].search([('name', '=', cust.get('CurrencyCode'))], limit=1)
+            currency = self.env['res.currency'].search([('name', '=', cust.get('CurrencyCode')),('active', 'in', [True, False])], limit=1)
+            if not currency.active:
+                currency.write({'active': True})
+
             dict_i['currency_id'] = currency.id
 
         if cust.get('Type') == 'ACCRECCREDIT':
@@ -3629,16 +3632,17 @@ class ResCompany(models.Model):
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_in')
-                        journal_payment_methods = journal.inbound_payment_method_ids
+                        journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_out')
-                        journal_payment_methods = journal.outbound_payment_method_ids
+                        journal_payment_methods = journal.outbound_payment_method_line_ids
 
                     if payment_method:
-                        dict_g['payment_method_id'] = payment_method.id
+                        dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                    if payment_method not in journal_payment_methods:
+                    _logger.info('\n\n\nPayment Method : {} {} {}'.format(payment_method,journal_payment_methods.payment_method_id.ids,journal_payment_methods))
+                    if payment_method not in journal_payment_methods.payment_method_id:
                         self._cr.commit()
                         raise ValidationError(_('No appropriate payment method enabled on journal %s') % journal.name)
         if not acc_pay:
@@ -3790,16 +3794,16 @@ class ResCompany(models.Model):
                                 if payment_type == 'inbound':
                                     dict_g['payment_type'] = 'inbound'
                                     payment_method = self.env.ref('account.account_payment_method_manual_in')
-                                    journal_payment_methods = journal.inbound_payment_method_ids
+                                    journal_payment_methods = journal.inbound_payment_method_line_ids
                                 else:
                                     dict_g['payment_type'] = 'outbound'
                                     payment_method = self.env.ref('account.account_payment_method_manual_out')
-                                    journal_payment_methods = journal.outbound_payment_method_ids
+                                    journal_payment_methods = journal.outbound_payment_method_line_ids
 
                                 if payment_method:
-                                    dict_g['payment_method_id'] = payment_method.id
+                                    dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                                if payment_method not in journal_payment_methods:
+                                if payment_method not in journal_payment_methods.payment_method_id:
                                     self._cr.commit()
                                     raise UserError(
                                         _('No appropriate payment method enabled on journal %s') % journal.name)
@@ -3864,16 +3868,16 @@ class ResCompany(models.Model):
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_in')
-                        journal_payment_methods = journal.inbound_payment_method_ids
+                        journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_out')
-                        journal_payment_methods = journal.outbound_payment_method_ids
+                        journal_payment_methods = journal.outbound_payment_method_line_ids
 
                     if payment_method:
-                        dict_g['payment_method_id'] = payment_method.id
+                        dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                    if payment_method not in journal_payment_methods:
+                    if payment_method not in journal_payment_methods.payment_method_id:
                         self._cr.commit()
                         raise UserError(
                             _('No appropriate payment method enabled on journal %s') % journal.name)
@@ -3902,16 +3906,16 @@ class ResCompany(models.Model):
                 if payment_type == 'inbound':
                     dict_g['payment_type'] = 'inbound'
                     payment_method = self.env.ref('account.account_payment_method_manual_in')
-                    journal_payment_methods = journal.inbound_payment_method_ids
+                    journal_payment_methods = journal.inbound_payment_method_line_ids
                 else:
                     dict_g['payment_type'] = 'outbound'
                     payment_method = self.env.ref('account.account_payment_method_manual_out')
-                    journal_payment_methods = journal.outbound_payment_method_ids
+                    journal_payment_methods = journal.outbound_payment_method_line_ids
 
                 if payment_method:
-                    dict_g['payment_method_id'] = payment_method.id
+                    dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                if payment_method not in journal_payment_methods:
+                if payment_method not in journal_payment_methods.payment_method_id:
                     self._cr.commit()
                     raise UserError(
                         _('No appropriate payment method enabled on journal %s') % journal.name)
@@ -4089,16 +4093,16 @@ class ResCompany(models.Model):
                                 if payment_type == 'inbound':
                                     dict_g['payment_type'] = 'inbound'
                                     payment_method = self.env.ref('account.account_payment_method_manual_in')
-                                    journal_payment_methods = journal.inbound_payment_method_ids
+                                    journal_payment_methods = journal.inbound_payment_method_line_ids
                                 else:
                                     dict_g['payment_type'] = 'outbound'
                                     payment_method = self.env.ref('account.account_payment_method_manual_out')
-                                    journal_payment_methods = journal.outbound_payment_method_ids
+                                    journal_payment_methods = journal.outbound_payment_method_line_ids
 
                                 if payment_method:
-                                    dict_g['payment_method_id'] = payment_method.id
+                                    dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                                if payment_method not in journal_payment_methods:
+                                if payment_method not in journal_payment_methods.payment_method_id:
                                     self._cr.commit()
                                     raise UserError(
                                         _('No appropriate payment method enabled on journal %s') % journal.name)
@@ -4163,16 +4167,16 @@ class ResCompany(models.Model):
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_in')
-                        journal_payment_methods = journal.inbound_payment_method_ids
+                        journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
                         payment_method = self.env.ref('account.account_payment_method_manual_out')
-                        journal_payment_methods = journal.outbound_payment_method_ids
+                        journal_payment_methods = journal.outbound_payment_method_line_ids
 
                     if payment_method:
-                        dict_g['payment_method_id'] = payment_method.id
+                        dict_g['payment_method_line_id'] = payment_method.id
 
-                    if payment_method not in journal_payment_methods:
+                    if payment_method not in journal_payment_methods.payment_method_id:
                         self._cr.commit()
                         raise UserError(
                             _('No appropriate payment method enabled on journal %s') % journal.name)
@@ -4200,16 +4204,16 @@ class ResCompany(models.Model):
                 if payment_type == 'inbound':
                     dict_g['payment_type'] = 'inbound'
                     payment_method = self.env.ref('account.account_payment_method_manual_in')
-                    journal_payment_methods = journal.inbound_payment_method_ids
+                    journal_payment_methods = journal.inbound_payment_method_line_ids
                 else:
                     dict_g['payment_type'] = 'outbound'
                     payment_method = self.env.ref('account.account_payment_method_manual_out')
-                    journal_payment_methods = journal.outbound_payment_method_ids
+                    journal_payment_methods = journal.outbound_payment_method_line_ids
 
                 if payment_method:
-                    dict_g['payment_method_id'] = payment_method.id
+                    dict_g['payment_method_line_id'] = journal_payment_methods.id
 
-                if payment_method not in journal_payment_methods:
+                if payment_method not in journal_payment_methods.payment_method_id:
                     self._cr.commit()
                     raise UserError(
                         _('No appropriate payment method enabled on journal %s') % journal.name)
