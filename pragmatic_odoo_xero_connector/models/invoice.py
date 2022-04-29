@@ -4,6 +4,7 @@ import requests
 import json
 import base64
 import logging
+from lxml import etree
 
 _logger = logging.getLogger(__name__)
 
@@ -71,12 +72,46 @@ class Invoice(models.Model):
             return {'warning': warning}
 
     @api.model
+    def _fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        """ Set the correct domain for `partner_id`, depending on invoice type """
+        result = super(Invoice, self)._fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,
+                                                              submenu=submenu)
+        _logger.info("CONTEXT IS ---------------> {}".format(self._context))
+        document_type = self._context.get('default_move_type')
+        _logger.info("DOCUMENT TYPE IS --> {}".format(document_type))
+        if view_type == 'form':
+            doc = etree.XML(result['arch'])
+            _logger.info("CONTEXT IS *************---------------> {}".format(doc))
+            node = doc.xpath("//field[@name='invoice_line_ids']/tree/field[@name='tax_ids']")[0]
+            node2 = doc.xpath("//field[@name='partner_id']")[0]
+            _logger.info("CONTEXT IS *************---------------> {}".format(node))
+            if document_type == 'in_invoice':
+                _logger.info("DOCUMENT IS OF TYPE VENDOR BILL")
+                node.set('domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
+                node2.set('domain', "[('supplier_rank', '>=', 1)]")
+            if document_type == 'out_invoice':
+                _logger.info("DOCUMENT IS OF TYPE CUSTOMER INVOICE")
+                node.set('domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
+                node2.set('domain', "[('customer_rank', '>=', 1)]")
+            if document_type == 'out_refund':
+                _logger.info("DOCUMENT IS OF TYPE CUSTOMER CREDIT NOTE")
+                node.set('domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
+                node2.set('domain', "[('customer_rank', '>=', 1)]")
+            if document_type == 'in_refund':
+                _logger.info("DOCUMENT IS OF TYPE  VENDOR CREDIT NOTE")
+                node.set('domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
+                node2.set('domain', "[('supplier_rank', '>=', 1)]")
+
+            result['arch'] = etree.tostring(doc)
+        return result
+
+    @api.model
     @api.onchange('tax_state')
     def onchange_tax_status(self):
         for line_id in self.invoice_line_ids:
-            if (self.tax_state == 'inclusive'):
+            if self.tax_state == 'inclusive':
                 line_id.inclusive = True
-            elif (self.tax_state == 'exclusive'):
+            elif self.tax_state == 'exclusive':
                 line_id.inclusive = False
             # if (self.tax_state == 'no_tax'):
             #     line_id.inclusive = False
