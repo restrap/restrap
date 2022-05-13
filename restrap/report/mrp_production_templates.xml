@@ -56,7 +56,7 @@
                                     font-size: 0.78rem;
                                     }
                                 </style>
-                                <div style="display: inline-table; height: 3cm; width:100%;">
+                                <div style="display: inline-table; height: 3.3cm; width:100%;">
                                     <table class="table table-bordered" style="border: 2px solid black;">
                                         <tr>
                                             <th class="table-active text-center">
@@ -112,7 +112,7 @@
                             <t t-foreach="range(qty)" t-as="item">
                                 <div class="page" style="page-break-before: always">
                                     <t t-translation="off">
-                                        <div style="display: inline-table; height: 3cm; width:100%;">
+                                        <div style="display: inline-table; height: 3.3cm; width:100%;">
                                             <table class="table table-bordered" style="border: 2px solid black;"
                                                    t-if="production.move_finished_ids">
                                                 <tr>
@@ -176,8 +176,8 @@
         <field name="margin_left">1</field>
         <field name="margin_right">1</field>
         <field name="header_line" eval="False"/>
-        <field name="header_spacing">0</field>
-        <field name="dpi">300</field>
+        <field name="header_spacing">1</field>
+        <field name="dpi">100</field>
     </record>
 
     <record id="mrp.action_report_finished_product" model="ir.actions.report">
