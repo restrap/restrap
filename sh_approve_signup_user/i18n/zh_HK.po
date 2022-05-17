@@ -1,0 +1,222 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* sh_approve_signup_user
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 14.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-10-30 12:00+0000\n"
+"PO-Revision-Date: 2020-10-30 12:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: sh_approve_signup_user
+#: model:mail.template,subject:sh_approve_signup_user.sh_signup_user_approve
+#: model:mail.template,subject:sh_approve_signup_user.sh_signup_user_reject
+msgid "${object.company_id.name} Account Confirmation Email"
+msgstr "${object.company_id.name} 帐户确认电子邮件"
+
+#. module: sh_approve_signup_user
+#: model:mail.template,body_html:sh_approve_signup_user.sh_signup_user_approve
+msgid ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">Account Confirmation</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        Hello ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Your account has been approved by administrator.\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Thank you.\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">帐户确认</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        你好 ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        您的帐户已被管理员批准。\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        谢谢。\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+
+#. module: sh_approve_signup_user
+#: model:mail.template,body_html:sh_approve_signup_user.sh_signup_user_reject
+msgid ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">Account Confirmation</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        Hello ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Your account has been rejected by administrator.\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Thank you.\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">帐户确认</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        你好 ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        您的帐户已被管理员拒绝。\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        谢谢。\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Another user is already registered using this email address."
+msgstr "已经使用此电子邮件地址注册了另一个用户。"
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Approve"
+msgstr "批准"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__approved
+msgid "Approved"
+msgstr "已批准"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Could not create a new account."
+msgstr "无法创建新帐户。"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__display_name
+msgid "Display Name"
+msgstr "显示名称"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__id
+msgid "ID"
+msgstr "ID"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users____last_update
+msgid "Last Modified on"
+msgstr "最后修改时间"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__draft
+msgid "Need Approval"
+msgstr "需要批准"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid ""
+"Only employees can access this database. Please contact the administrator."
+msgstr ""
+“只有员工可以访问此数据库。请与管理员联系。”
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Reject"
+msgstr "拒绝"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__rejected
+msgid "Rejected"
+msgstr "拒绝"
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Set To Draft"
+msgstr "设置为草稿"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: invalid template user"
+msgstr "注册：无效的模板用户"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: no login given for new user"
+msgstr "注册：未为新用户登录"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: no name or partner given for new user"
+msgstr "注册：未为新用户提供名称或合作伙伴"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__status
+msgid "State"
+msgstr "州"
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "User Confirmation"
+msgstr "用户确认"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__sh_user_from_signup
+msgid "User From Signup ?"
+msgstr "用户来自注册？"
+
+#. module: sh_approve_signup_user
+#: model:ir.model,name:sh_approve_signup_user.model_res_users
+msgid "Users"
+msgstr "用户数"
+
+#. module: sh_approve_signup_user
+#: model:ir.actions.act_window,name:sh_approve_signup_user.action_user_confirmation
+#: model:ir.ui.menu,name:sh_approve_signup_user.menu_users_confirmation
+msgid "Users Confirmation"
+msgstr "用户确认"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Wrong login/password"
+msgstr "登录/密码错误"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Your account already registered! Please wait for account approval."
+msgstr "您的帐户已经注册！请等待帐户批准。"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Your account rejected by administrator."
+msgstr "您的帐户已被管理员拒绝。"
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Your registration successfully! Please wait for account approval."
+msgstr "您的注册成功！请等待帐户批准。"
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__sh_portal_users
+msgid "portal Users"
+msgstr "门户用户"
