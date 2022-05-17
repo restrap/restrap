@@ -1,0 +1,195 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* sh_approve_signup_user
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 14.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-10-30 12:00+0000\n"
+"PO-Revision-Date: 2020-10-30 12:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: sh_approve_signup_user
+#: model:mail.template,subject:sh_approve_signup_user.sh_signup_user_approve
+#: model:mail.template,subject:sh_approve_signup_user.sh_signup_user_reject
+msgid "${object.company_id.name} Account Confirmation Email"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:mail.template,body_html:sh_approve_signup_user.sh_signup_user_approve
+msgid ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">Account Confirmation</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        Hello ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Your account has been approved by administrator.\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Thank you.\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:mail.template,body_html:sh_approve_signup_user.sh_signup_user_reject
+msgid ""
+"<div style=\"margin: 0px; padding: 0px;\">\n"
+"                    <h2 align=\"center\">Account Confirmation</h2>\n"
+"                    <p style=\"margin: 0px; padding: 0px; font-size: 13px;\">\n"
+"                        Hello ${object.name},\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Your account has been rejected by administrator.\n"
+"                        <br/>\n"
+"                        <br/>\n"
+"                        Thank you.\n"
+"                    </p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Another user is already registered using this email address."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Approve"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__approved
+msgid "Approved"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Could not create a new account."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__id
+msgid "ID"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users____last_update
+msgid "Last Modified on"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__draft
+msgid "Need Approval"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid ""
+"Only employees can access this database. Please contact the administrator."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Reject"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields.selection,name:sh_approve_signup_user.selection__res_users__status__rejected
+msgid "Rejected"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "Set To Draft"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: invalid template user"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: no login given for new user"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/models/res_users.py:0
+#, python-format
+msgid "Signup: no name or partner given for new user"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__status
+msgid "State"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model_terms:ir.ui.view,arch_db:sh_approve_signup_user.view_user_confirmation_tree
+msgid "User Confirmation"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__sh_user_from_signup
+msgid "User From Signup ?"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model,name:sh_approve_signup_user.model_res_users
+msgid "Users"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.actions.act_window,name:sh_approve_signup_user.action_user_confirmation
+#: model:ir.ui.menu,name:sh_approve_signup_user.menu_users_confirmation
+msgid "Users Confirmation"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Wrong login/password"
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Your account already registered! Please wait for account approval."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/web_main.py:0
+#, python-format
+msgid "Your account rejected by administrator."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: code:addons/sh_approve_signup_user/controllers/main.py:0
+#, python-format
+msgid "Your registration successfully! Please wait for account approval."
+msgstr ""
+
+#. module: sh_approve_signup_user
+#: model:ir.model.fields,field_description:sh_approve_signup_user.field_res_users__sh_portal_users
+msgid "portal Users"
+msgstr ""

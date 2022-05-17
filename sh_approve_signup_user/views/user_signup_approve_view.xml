@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sh_res_users_form_view" model="ir.ui.view">
+        <field name="name">sh.res.users.form.view</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('oe_title')]//field[@name='partner_id']" position="after">
+                <field name="sh_user_from_signup" invisible="1" />
+                <field name="sh_portal_users" invisible="1" />
+            </xpath>
+        </field>
+    </record>
+    <record id="view_user_confirmation_tree" model="ir.ui.view">
+        <field name="name">res.users.confirmation.tree</field>
+        <field name="model">res.users</field>
+        <field name="arch" type="xml">
+            <tree string="User Confirmation">
+                <field name="name" />
+                <field name="login" />
+                <field name="status" />
+                <button name="action_approve_user" string="Approve" class="oe_highlight" type="object" attrs="{'invisible':[('status','in',('approved','rejected'))]}" />
+                <button name="action_reject_user" string="Reject" class="oe_highlight" type="object" attrs="{'invisible':[('status','in',('approved','rejected'))]}" />
+                <button name="action_draft_user" string="Set To Draft" class="oe_highlight" type="object" attrs="{'invisible':[('status','in',('draft'))]}" />
+            </tree>
+        </field>
+    </record>
+    <record id="action_user_confirmation" model="ir.actions.act_window">
+        <field name="name">Users Confirmation</field>
+        <field name="res_model">res.users</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('sh_user_from_signup','=',True)]</field>
+        <field name="context">{}</field>
+        <field name="view_id" ref="sh_approve_signup_user.view_user_confirmation_tree" />
+    </record>
+    <menuitem id="menu_users_confirmation" name="Users Confirmation" action="action_user_confirmation" parent="base.menu_users" />
+</odoo>
