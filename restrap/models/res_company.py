@@ -9,3 +9,4 @@ class ResCompany(models.Model):
 
     mrp_split = fields.Boolean("Manufacture Order Split")
     mrp_split_duration = fields.Float("Manufacture Order Split Duration")
+    eori = fields.Char(string="EORI")
