@@ -25,5 +25,10 @@
         'views/mrp_routing_workcenter_views.xml',
         'views/res_company_views.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'restrap/static/src/js/field_utils.js',
+            ]
+    },
     'license': 'LGPL-3',
 }
