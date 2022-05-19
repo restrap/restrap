@@ -24,6 +24,10 @@
         'views/product_views.xml',
         'views/mrp_routing_workcenter_views.xml',
         'views/res_company_views.xml',
+        'views/external_layout_views.xml',
+        'views/sale_order_report.xml',
+        'views/account_invoice_report.xml',
+
     ],
     'assets': {
         'web.assets_backend': [

@@ -10,3 +10,4 @@ from . import product
 from . import mrp_routing_workcenter
 from . import res_partner
 from . import account_move
+from . import ir_qweb_fields

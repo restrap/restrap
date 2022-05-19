@@ -1,7 +1,19 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-from odoo import fields, models
+from odoo import fields, models, api
+
+
+class AccountMove(models.Model):
+    _inherit = 'account.move'
+
+    total_qty = fields.Float(string="Total Units", compute='get_total_qty')
+
+    @api.depends('invoice_line_ids.quantity')
+    def get_total_qty(self):
+        for record in self:
+            record.total_qty = sum(line.quantity for line in record.invoice_line_ids.
+                                   filtered(lambda l: l.product_id.type != 'service'))
 
 
 class AccountMoveLine(models.Model):
