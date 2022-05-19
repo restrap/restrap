@@ -12,7 +12,7 @@
         </field>
     </record>
 
-    <!-- List View -->
+    <!-- Quotations List View -->
     <record id="quotation_tree_inherit_view" model="ir.ui.view">
         <field name="name">sale.order.quotation.inherit.view</field>
         <field name="model">sale.order</field>
@@ -30,6 +30,7 @@
         </field>
     </record>
 
+    <!-- Sales Orders List View -->
     <record id="sale_order_tree_inherit_view" model="ir.ui.view">
         <field name="name">sale.order.inherit.view</field>
         <field name="model">sale.order</field>
@@ -47,32 +48,27 @@
         </field>
     </record>
 
-    <!-- Search View -->
+    <!-- Quotations Search View -->
     <record id="sale_order_quotation_view_search_inherit_quotation" model="ir.ui.view">
         <field name="name">sale.order.quotation.search.inherit.quotation</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.sale_order_view_search_inherit_quotation"/>
         <field name="arch" type="xml">
-            <xpath expr="//filter[@name='filter_create_date']" position="before">
-                <filter string="Normal" name="normal_priority" domain="[('priority','=', '0')]"/>
-                <filter string="Urgent" name="urgent_priority" domain="[('priority','=', '1')]"/>
-                <separator/>
+            <xpath expr="//filter[@name='my_quotation']" position="after">
+                <filter string="Starred" name="urgent_priority" domain="[('priority','=', '1')]"/>
             </xpath>
-
         </field>
     </record>
 
+    <!-- Sales Orders Search View -->
     <record id="sale_order_view_search_inherit_quotation" model="ir.ui.view">
         <field name="name">sale.order.search.inherit.quotation</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.sale_order_view_search_inherit_sale"/>
         <field name="arch" type="xml">
-            <xpath expr="//filter[@name='order_date']" position="before">
-                <filter string="Normal" name="normal_priority" domain="[('priority','=', '0')]"/>
-                <filter string="Urgent" name="urgent_priority" domain="[('priority','=', '1')]"/>
-                <separator/>
+            <xpath expr="//filter[@name='my_sale_orders_filter']" position="after">
+                <filter string="Starred" name="urgent_priority" domain="[('priority','=', '1')]"/>
             </xpath>
-
         </field>
     </record>
 
