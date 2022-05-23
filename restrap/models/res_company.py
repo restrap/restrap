@@ -9,10 +9,3 @@ class ResCompany(models.Model):
 
     mrp_split = fields.Boolean("Manufacture Order Split")
     mrp_split_duration = fields.Float("Manufacture Order Split Duration")
-    eori = fields.Char(string="EORI")
-
-
-class BaseDocumentLayout(models.TransientModel):
-    _inherit = 'base.document.layout'
-
-    eori = fields.Char(string="EORI", related='company_id.eori')

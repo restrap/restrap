@@ -14,9 +14,6 @@
             <xpath expr="//field[@name='user_id']" position="after">
                 <field name="reference" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
             </xpath>
-            <xpath expr="//field[@name='date_planned_start']" position="after">
-                <field name="planned_week" invisible="1"/>
-            </xpath>
         </field>
     </record>
 </odoo>
