@@ -8,7 +8,7 @@
     'description': "Custom module for Restrap developed by Smart IT Ltd",
     'maintainer': "Smart IT Ltd",
     'website': 'smart-ltd.co.uk',
-    "depends": ['base', 'mrp_workorder', 'sale_management', 'delivery'],
+    "depends": ['base', 'mrp_workorder', 'sale_management'],
     "data": [
         'security/mrp_security.xml',
         'security/ir.model.access.csv',
@@ -23,15 +23,6 @@
         'report/mrp_production_templates.xml',
         'views/product_views.xml',
         'views/mrp_routing_workcenter_views.xml',
-        'views/res_company_views.xml',
-        'views/report_templates.xml',
-        'views/sale_order_report.xml',
-        'views/account_invoice_report.xml',
     ],
-    'assets': {
-        'web.assets_backend': [
-            'restrap/static/src/js/field_utils.js',
-        ]
-    },
     'license': 'LGPL-3',
 }

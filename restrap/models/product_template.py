@@ -9,5 +9,3 @@ class ProductTemplate(models.Model):
 
     sewing_teams = fields.Many2many('mrp.workcenter', 'product_workcenter_rel', 'prod_id', 'workcenter_id',
                                     string="Available Sewing Teams")
-
-    origin_country_id = fields.Many2one('res.country', string="Origin")
