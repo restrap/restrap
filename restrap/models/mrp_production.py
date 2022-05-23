@@ -16,6 +16,13 @@ class MrpProduction(models.Model):
     allow_mrp_split = fields.Boolean("Split allowed?", related="company_id.mrp_split")
     mrp_split_done = fields.Boolean("Split Done?", copy=False)
     reference = fields.Selection([('a', 'A'), ('b', 'B'), ('c', 'C')], string="Reference")
+    planned_week = fields.Char("Planned Week", compute='_calculate_week_of_planned_date', store=True)
+
+    @api.depends('date_planned_start')
+    def _calculate_week_of_planned_date(self):
+        for rec in self:
+            if rec.date_planned_start:
+                rec.planned_week = rec.date_planned_start.strftime("%V")
 
     def action_spilt(self):
         self.ensure_one()
