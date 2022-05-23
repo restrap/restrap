@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <template id="report_saleorder_document" inherit_id="sale.report_saleorder_document" name="report_saleorder_document_restrap">
+        <!-- Pass show_barcode to show barcode in quotation/SO header -->
+        <xpath expr="//t[@t-call='web.external_layout']" position="before">
+            <t t-set="show_barcode" t-value="True"/>
+        </xpath>
+
+        <!-- HS Code field in order lines table -->
+        <xpath expr="//table[hasclass('o_main_table')]/thead/tr/th[1]" position="after">
+            <th name="th_hscode">HS Code</th>
+        </xpath>
+
+        <xpath expr="//table[hasclass('o_main_table')]/tbody/t[2]/tr/t/td[1]" position="after">
+            <td name="td_hscode"><span t-field="line.product_id.hs_code"/></td>
+        </xpath>
+    </template>
+
+    <template id="document_tax_totals_sales" inherit_id="account.document_tax_totals" name="document_tax_totals_restrap_sales">
+        <!-- Add total units to totals table -->
+        <xpath expr="//t[@t-as='subtotal']" position="before">
+            <tr t-if="doc and doc._name == 'sale.order'" class="border-black o_total">
+                <td><strong>Total Units</strong></td>
+                <td class="text-right">
+                    <span t-field="doc.total_qty"/>
+                </td>
+            </tr>
+        </xpath>
+    </template>
+
+</odoo>

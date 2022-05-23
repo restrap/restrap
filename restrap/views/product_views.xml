@@ -9,6 +9,23 @@
             <xpath expr="//field[@name='barcode']" position="after">
                 <field name="sewing_teams" widget="many2many_tags" domain="[('name', 'like', 'Sewing')]" />
             </xpath>
+            <xpath expr="//field[@name='hs_code']" position="after">
+                <field name="origin_country_id" options="{'no_create': 1}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_normal_form_view_restrap" model="ir.ui.view">
+        <field name="name">product.product.product.form.restrap</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='barcode']" position="after">
+                <field name="sewing_teams" widget="many2many_tags" domain="[('name', 'like', 'Sewing')]" />
+            </xpath>
+            <xpath expr="//field[@name='hs_code']" position="after">
+                <field name="origin_country_id" options="{'no_create': 1}"/>
+            </xpath>
         </field>
     </record>
 </odoo>
