@@ -26,12 +26,14 @@ function formatFloat(value, field, options) {
     var formatted = _.str.sprintf('%.' + precision + 'f', value || 0).split('.');
     formatted[0] = utils.insert_thousand_seps(formatted[0]);
 
-    if (field.name == 'product_uom_qty' || field.name == 'qty_delivered' || field.name == 'qty_invoiced'
-        || field.name == 'qty_to_invoice' || field.name == 'product_qty' || field.name == 'quantity'){
-        return formatted.join(l10n.decimal_point).replace(/0+$/g, "").replace(/[.]$/,"");
-    }
-    else {
-        return formatted.join(l10n.decimal_point);
+    if (field){
+        if (field.name == 'product_uom_qty' || field.name == 'qty_delivered' || field.name == 'qty_invoiced'
+            || field.name == 'qty_to_invoice' || field.name == 'product_qty' || field.name == 'quantity'){
+            return formatted.join(l10n.decimal_point).replace(/0+$/g, "").replace(/[.]$/,"");
+        }
+        else {
+            return formatted.join(l10n.decimal_point);
+        }
     }
 
 }
