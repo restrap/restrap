@@ -953,6 +953,9 @@ class Invoice(models.Model):
             invoice = self
 
         for t in invoice:
+            # Ignore it if it's part of a payment that was imported from Xero.
+            if t.payment_id.xero_payment_id:
+                continue
             # print(t.move_type, 'Move type \n\n\n')
             if (t.move_type == 'out_refund') or (t.move_type == 'in_refund'):
                 self.exportCreditNote()
