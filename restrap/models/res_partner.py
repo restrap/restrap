@@ -5,5 +5,8 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     def create(self, vals_list):
-        vals_list['company_id'] = self.env.company.id
+        # BUG for ticket 28510.
+        # FIX: can save new contacts.
+        for vals in vals_list:
+            vals['company_id'] = self.env.company.id
         return super(ResPartner, self).create(vals_list)
