@@ -11,4 +11,18 @@
             </xpath>
         </field>
     </record>
+    <!-- Inherits search in Operations->Work Orders -->
+    <record id="mrp_workorder_filter_inherit_restrap" model="ir.ui.view">
+        <field name="name">MRP Work Order Filter View Restrap</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp.view_mrp_production_workorder_form_view_filter"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='name']" position="before">
+          <xpath expr="//field[@name='production_id']" position="move"/>
+        </xpath>
+
+        </field>
+    </record>
+
 </odoo>
