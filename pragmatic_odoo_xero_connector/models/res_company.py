@@ -2941,6 +2941,10 @@ class ResCompany(models.Model):
                                         [('name', 'ilike', address.get('Country').title())], limit=1)
 
                             if not country:
+                                country = self.env['res.country'].search(
+                                    [('alias_ids.name', '=', address.get('Country'))], limit=1)
+
+                            if not country:
                                 raise UserError('Country Not Found : ' + address.get('Country') + '\nContact Name : ' + item.get('Name'))
 
                         if address.get('Region'):
@@ -3002,7 +3006,7 @@ class ResCompany(models.Model):
                                     #                 break
 
                                     if not state:
-                                        raise UserError('\nState Not Found : ' + address.get('Region') + '\nCountry Name : ' + country.name + '\nContact Name : ' + item.get('Name'))
+                                        _logger.info('\nState Not Found: ' + address.get('Region') + '\nCountry Name: ' + country.name + '\nContact Name: ' + item.get('Name'))
 
                         dict_customer.update({
                             'street':street1,
@@ -3474,7 +3478,7 @@ class ResCompany(models.Model):
                         if not record.get('Status') == 'DELETED':
                             self.create_imported_payments(record)
                     else:
-                        for grp in parsed_dict.get('Payments'):
+                        for grp in record:
                             if not grp.get('Status') == 'DELETED':
                                 self.create_imported_payments(grp)
                     success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view',
@@ -3624,6 +3628,16 @@ class ResCompany(models.Model):
 
                 if 'partner_id' in dict_g:
                     journal_id = self.env['account.journal'].get_journal_from_account(pay.get('Account').get('Code'))
+                    if not journal_id:
+                        if pay.get('Invoice') and pay.get('Invoice').get('InvoiceNumber'):
+                            _logger.info(_(
+                                "Payment journal is not defined for XERO's Account '%s' while trying to create payment for Xero invoice '%s'." % (
+                                    str(pay.get('Account').get('Code')), str(pay.get('Invoice').get('InvoiceNumber')))))
+                        else:
+                            _logger.info(_(
+                                "Payment journal is not defined for XERO's Account '%s'." % (
+                                    str(pay.get('Account').get('Code')))))
+                        return
                     dict_g['journal_id'] = journal_id.id
 
                     payment_type = 'inbound' if pay_type == 'sale' else 'outbound'
@@ -3652,17 +3666,22 @@ class ResCompany(models.Model):
                 else:
                     _logger.info('\n\n[Payment] DICTIONARY :: %s', dict_g)
                     if invoice_pay:
-                        if dict_g['date']:
-                            dict_g['payment_date'] = dict_g['date']
-                            del dict_g['date']
-                        register_payments = self.env['account.payment.register'].with_context(
-                            active_model='account.move',
-                            active_ids=invoice_pay.id).create(dict_g)
-                        payment_id = register_payments._create_payments()
-                        if pay.get('PaymentID') and payment_id:
-                            payment_id.xero_payment_id = pay.get('PaymentID')
+                        if invoice_pay.payment_state != 'paid' and invoice_pay.state != 'cancel':
+                            if dict_g['date']:
+                                dict_g['payment_date'] = dict_g['date']
+                                del dict_g['date']
+                            register_payments = self.env['account.payment.register'].with_context(
+                                active_model='account.move',
+                                active_ids=invoice_pay.id).create(dict_g)
+                            payment_id = register_payments._create_payments()
+                            if pay.get('PaymentID') and payment_id:
+                                payment_id.xero_payment_id = pay.get('PaymentID')
 
-                        self._cr.commit()
+                            self._cr.commit()
+                        else:
+                            _logger.info(
+                                "Payment couldn't be created for %s as it was already marked as 'paid' within Odoo, or was cancelled within Odoo." % (
+                                    invoice_pay.display_name))
                     else:
                         if pay.get('PaymentID'):
                             dict_g['xero_payment_id'] = pay.get('PaymentID')
@@ -4330,7 +4349,7 @@ class AccountJournal(models.Model):
         res_id_user = self.env['res.company'].search([])
 
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        _logger.info('\n\nXero Acount code for Find Journal : \n\n{}\n\n'.format(xero_account_code))
+        _logger.info('\n\nXero Account code for Find Journal: \n\n{}\n\n'.format(xero_account_code))
         account_id = self.env['account.account'].search(
             [('code', '=', xero_account_code), ('company_id', '=', xero_config.id)])
         account = self.env['account.account'].browse(account_id)
@@ -4339,6 +4358,4 @@ class AccountJournal(models.Model):
                                   ('company_id', '=', xero_config.id)],
                                  limit=1)
 
-        if not journal_id:
-            raise ValidationError(_("Payment journal is not defined for XERO's Account : %s " % (xero_account_code)))
         return journal_id
