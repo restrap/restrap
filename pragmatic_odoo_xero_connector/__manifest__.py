@@ -33,6 +33,7 @@ accounting app
         'views/account_payments.xml',
         'views/maintain_logs.xml',
         'views/sale_order.xml',
+        'views/res_country.xml',
         'views/automated_authentication_scheduler.xml',
         'security/ir.model.access.csv',
     ],
