@@ -57,12 +57,20 @@ class Customer(models.Model):
             mobile_dict = {}
 
             if self.name:
-                dict['Name'] = self.name
-            #                 dict['firstName']= 'firstname'
-            #                 dict['LastName']= 'Lastname'
+                if self.parent_id:
+                    if self.parent_id.name and self.name:
+                        dict['Name'] = '{}, {}'.format(self.parent_id.name, self.name)
+                    else:
+                        dict['Name'] = '{}'.format(self.name) if self.name else ''
+
+                    # dict['FirstName'] = self.name
+                    # dict['LastName']= 'Lastname'
+                else:
+                    dict['Name'] = self.name
+
             if self.email:
                 dict['EmailAddress'] = self.email
-                _logger.info("\nEmail Address : %s", self.email)
+                _logger.info("\nEmail Address : {}".format(self.email))
 
             if self.id:
                 dict['ContactNumber'] = self.id
@@ -239,7 +247,7 @@ class Customer(models.Model):
             partner = self
 
         for con in partner:
-            self.create_main_customer_in_xero(con,xero_config)
+            self.create_main_customer_in_xero(con, xero_config)
         success_form = self.env.ref('pragmatic_odoo_xero_connector.export_successfull_view', False)
         return {
             'name': _('Notification'),
@@ -268,10 +276,6 @@ class Customer(models.Model):
         }
         return headers
 
-
-
-
-
     @api.model
     def create_main_customer_in_xero(self,con,xero_config):
             if con:
@@ -290,11 +294,10 @@ class Customer(models.Model):
                     protected_url = 'https://api.xero.com/api.xro/2.0/Contacts'
                     data = requests.request('POST', url=protected_url, data=parsed_dict ,headers=headers)
                     if data.status_code == 200:
-
                         response_data = json.loads(data.text)
                         if response_data.get('Contacts'):
                                 con.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
-                                _logger.info("\nExported Contact : %s %s", con,con.name)
+                                _logger.info("\nExported Contact : {} {}".format(con, con.name))
                                 child_ids_all = self.search(
                                     [('parent_id', '=', con.id), ('company_id', '=', xero_config.id)])
                                 if child_ids_all:
@@ -305,7 +308,7 @@ class Customer(models.Model):
                                 if child_ids:
                                     for child in child_ids:
                                         child.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
-                                        _logger.info("\nExported Sub-Contact : %s %s", child,child.name)
+                                        _logger.info("\nExported Sub-Contact : {} {}".format(child, child.name))
 
                     elif data.status_code == 400:
                         logs = self.env['xero.error.log'].create({

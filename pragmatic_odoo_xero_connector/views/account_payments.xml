@@ -8,9 +8,9 @@
 		<field name="arch" type="xml">
 
 			<field name="date" position="after">
-				<field name="xero_payment_id" readonly="1" help="Xero Payment Id which gets generated automatically after creating account"/>
-				<field name="xero_prepayment_id" readonly="1" help="Xero Payment Id which gets generated automatically after creating account"/>
-				<field name="xero_overpayment_id" readonly="1" help="Xero Payment Id which gets generated automatically after creating account"/>
+				<field name="xero_payment_id"  help="Xero Payment Id which gets generated automatically after creating account"/>
+				<field name="xero_prepayment_id"  help="Xero Payment Id which gets generated automatically after creating account"/>
+				<field name="xero_overpayment_id"  help="Xero Payment Id which gets generated automatically after creating account"/>
 			</field>
 
 		</field>

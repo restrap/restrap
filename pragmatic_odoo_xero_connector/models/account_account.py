@@ -137,7 +137,6 @@ class Account(models.Model):
             if not a.xero_account_id:
                 vals = a.prepare_account_export_dict()
                 parsed_dict = json.dumps(vals)
-                # print("PARSED DICT : ",parsed_dict,type(parsed_dict))
 
                 if xero_config.xero_oauth_token:
                     token = xero_config.xero_oauth_token
@@ -151,7 +150,6 @@ class Account(models.Model):
 
                     protected_url = 'https://api.xero.com/api.xro/2.0/Accounts'
                     data = requests.request('PUT', url=protected_url, data=parsed_dict, headers=headers)
-                    # print("DATA : ",data,data.text)
                     if data.status_code == 200:
                         response_data = json.loads(data.text)
                         if response_data.get('Accounts'):
@@ -161,10 +159,7 @@ class Account(models.Model):
                                     'xero_account_id': response_data.get('Accounts')[0].get('AccountID')
                                 })
                                 self._cr.commit()
-                                # print("ACC ID : ",a.xero_account_id)
                                 _logger.info(_(" (CREATE) - Exported successfully to XERO"))
-                                # self._cr.commit()
-                                # self.SuccessMessage()
                     elif data.status_code == 400:
                         logs = self.env['xero.error.log'].create({
                             'transaction': 'Account Export',
@@ -181,7 +176,8 @@ class Account(models.Model):
                                         for err in element.get('ValidationErrors'):
                                             if err.get('Message'):
                                                 raise ValidationError(
-                                                    '(Account) Xero Exception : ' + err.get('Message'))
+                                                    '(Account) Xero Exception : ' + err.get(
+                                                        'Message') + '\nExported Data: ' + str(parsed_dict))
                             elif response_data.get('Message'):
                                 raise ValidationError(
                                     '(Account) Xero Exception : ' + response_data.get('Message'))
@@ -208,7 +204,6 @@ class Account(models.Model):
                     protected_url = 'https://api.xero.com/api.xro/2.0/Accounts/' + a.xero_account_id
 
                     data = requests.request('POST', url=protected_url, headers=headers, data=parsed_dict)
-                    # print("DATA ----------------> ", data, data.text)
                     if data.status_code == 200:
                         _logger.info(_(" (UPDATE) - Exported successfully to XERO"))
                     elif data.status_code == 401:
@@ -286,15 +281,12 @@ class AnalyticAccountGroupsInherit(models.Model):
 
                 vals.update({'Name': t.name, 'Status': status})
                 parsed_dict = json.dumps(vals)
-                # print('\n\n\n___________________________1')
                 url = 'https://api.xero.com/api.xro/2.0/TrackingCategories'
                 data = self.put_data(url, parsed_dict)
 
-                # print('\n\n\n___________________________2',data)
                 if data.status_code == 200:
                     parsed_data = json.loads(data.text)
 
-                    # print('\n\n\n___________________________3', parsed_data)
                     if parsed_data:
                         if parsed_data.get('TrackingCategories'):
                             t.xero_tracking_id = parsed_data.get(
@@ -310,8 +302,8 @@ class AnalyticAccountGroupsInherit(models.Model):
                         msg = Error[0].get('ValidationErrors')
                         msg = msg[0].get('Message')
 
-                        _logger.info(_("\n\n\n Error \n %s\n\n" %msg))
-                        raise ValidationError(_('%s'%msg))
+                        _logger.info(_("\n\n\n Error \n %s\n\n" % msg))
+                        raise ValidationError(_('%s' % msg))
 
                 elif data.status_code == 401:
                     raise ValidationError('Please refresh token first')
@@ -338,6 +330,7 @@ class AnalyticAccountGroupsInherit(models.Model):
 class AnalyticAccountInherit(models.Model):
     _inherit = 'account.analytic.account'
 
+    # xero_tracking_id = fields.Char(string="Xero Tracking Id", copy=False)
     xero_tracking_opt_id = fields.Char(string="Xero Tracking Id", copy=False)
     is_active = fields.Boolean(string="Is Active", default=True)
 
@@ -349,8 +342,6 @@ class AnalyticAccountInherit(models.Model):
                 account = self
         else:
             account = self.env['account.analytic.account'].browse(account_id)
-
-        # print(account, '++___________+++++++++___________+++++++++++_________++++++')
 
         for t in account:
             vals = {}
@@ -378,7 +369,6 @@ class AnalyticAccountInherit(models.Model):
                     if data.status_code == 200:
                         parsed_data = json.loads(data.text)
                         if parsed_data:
-                            # print("\n\nResponse From Api In Dictionary\n\n\n\n\n : ", data)
                             if parsed_data.get('Options'):
                                 t.xero_tracking_opt_id = parsed_data.get(
                                     'Options')[0].get('TrackingOptionID')
@@ -397,7 +387,6 @@ class AnalyticAccountInherit(models.Model):
                     url = 'https://api.xero.com/api.xro/2.0/TrackingCategories/{}/Options/{}'.format(
                         obj.xero_tracking_id, t.xero_tracking_opt_id)
                     data = obj.put_data(url, parsed_dict, post=1)
-                    # print('\n\n\n___________________________2', url, t.group_id.id, data, data.text)
 
                     if data.status_code == 200:
                         _logger.info(_('{} Analytic Account Updated Successfully '.format(t.name)))
@@ -411,3 +400,9 @@ class AnalyticAccountInherit(models.Model):
                             _logger.info(_("\n\n\n Error \n %s\n\n" % msg))
                             raise ValidationError(_('%s' % msg))
 
+
+class AnalyticAccountTagInherit(models.Model):
+    _inherit = 'account.analytic.tag'
+
+    xero_tracking_opt_id = fields.Char(string="XERO Tracking Option ID", copy=False)
+    company_id = fields.Many2one(default=lambda self: self.env.company)

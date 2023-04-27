@@ -23,7 +23,6 @@ class ProductProduct(models.Model):
         if product.xero_product_id:
             return product.xero_product_id
         else:
-            # print("product : ", product)
             self.create_single_product_in_xero(product)
             if product.xero_product_id:
                 return product.xero_product_id
@@ -159,7 +158,10 @@ class ProductProduct(models.Model):
                 }
             })
         else:
-            raise ValidationError('Please enter Internal Reference for ' + self.name)
+            if self.name:
+                raise ValidationError('Please enter Internal Reference for {} '.format(self.name))
+            else:
+                raise ValidationError('Please enter Internal Reference for Product id : {}'.format(self.id))
 
         #   DICTIONARY FOR PRODUCT WITH INCOME AND EXPENSE ACCOUNTS
         if self.name:
@@ -237,21 +239,22 @@ class ProductProduct(models.Model):
         #     self.create_main_product_in_xero(product, xero_config)
         # else:
         #     print("hello", product.product_tmpl_id, product)
-        self.create_main_product_in_xero(product, xero_config)
+        if product:
+            self.create_main_product_in_xero(product, xero_config)
 
     @api.model
     def create_main_product_in_xero(self, p, xero_config):
         # print("--------------=====================------------ ", p)
         vals = p.prepare_product_export_dict()
         parsed_dict = json.dumps(vals)
-        # print("PARSED DICT : ", parsed_dict, type(parsed_dict))
+        _logger.info("PARSED DICT : {} {}".format(parsed_dict, type(parsed_dict)))
+        token = None
         if xero_config.xero_oauth_token:
             token = xero_config.xero_oauth_token
         headers = self.get_head()
 
         if token:
             protected_url = 'https://api.xero.com/api.xro/2.0/Items'
-
             data = requests.request('POST', url=protected_url, headers=headers, data=parsed_dict)
             _logger.info("\n\nPRODUCT DATA : %s %s % s", p, data, data.text)
 

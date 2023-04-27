@@ -3,6 +3,8 @@ from odoo.exceptions import ValidationError
 import requests
 import base64
 import json
+import re
+
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -12,6 +14,15 @@ class PurchaseOrder(models.Model):
     xero_purchase_id = fields.Char(string="Xero PO Id",copy=False)
     tax_state = fields.Selection([('inclusive', 'Tax Inclusive'), ('exclusive', 'Tax Exclusive'), ('no_tax', 'No Tax')],
                                  string='Tax Status', default='exclusive')
+
+    @api.depends('order_line.invoice_lines.move_id')
+    def _compute_invoice(self):
+        for order in self:
+            invoices = order.mapped('order_line.invoice_lines.move_id')
+            bills = self.env['account.move'].search([('xero_invoice_number', '=', order.name)])
+            _logger.info('Bills ++++++++++++===>: {}'.format(bills + invoices))
+            order.invoice_ids = invoices + bills
+            order.invoice_count = len(invoices + bills)
 
     @api.model
     @api.onchange('tax_state')
@@ -46,12 +57,20 @@ class PurchaseOrder(models.Model):
                                 'TaxType': tax
                                 }
             else:
-                line_vals = {
-                    'Description': line.name,
-                    'UnitAmount': line.price_unit,
-                    'ItemCode': line.product_id.default_code,
-                    'Quantity': line.product_qty,
-                }
+                if line.product_id:
+                    line_vals = {
+                        'Description': line.name,
+                        'UnitAmount': line.price_unit,
+                        'ItemCode': line.product_id.default_code,
+                        'Quantity': line.product_qty,
+                    }
+                else:
+                    line_vals = {
+                        'Description': line.name,
+                        # 'UnitAmount': line.price_unit,
+                        # 'ItemCode': line.product_id.default_code,
+                        # 'Quantity': line.product_qty,
+                    }
 
         return line_vals
 
@@ -91,10 +110,21 @@ class PurchaseOrder(models.Model):
             partner_ref = self.partner_ref
         else:
             partner_ref = ''
+
+        def remove_tags(text):
+            """
+            Removes html test from string
+            :param text:
+            :return: new string
+            """
+            TAG_RE = re.compile(r'<[^>]+>')
+            return TAG_RE.sub('', text)
+
         if self.notes:
-            notes = self.notes
+            notes = remove_tags(self.notes)
         else:
             notes = ''
+
 
         if len(self.order_line) == 1:
             single_line = self.order_line
@@ -207,7 +237,6 @@ class PurchaseOrder(models.Model):
             if not t.xero_purchase_id:
                 vals = t.prepare_purchaseorder_export_dict()
                 parsed_dict = json.dumps(vals)
-                # print("PARSED DICT : ", parsed_dict, type(parsed_dict))
                 if xero_config.xero_oauth_token:
                     token = xero_config.xero_oauth_token
                 headers = self.get_head()
@@ -296,7 +325,7 @@ class PurchaseOrder(models.Model):
     @api.model
     def exportPurchaseOrder_cron(self):
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        purchase_id = self.env['purchase.order'].search([('create_date', '>', xero_config.export_record_after)])
+        purchase_id = self.env['purchase.order'].search([('date_approve', '>', xero_config.export_record_after)])
         for purchase in purchase_id:
             purchase.exportPurchaseOrder()
 

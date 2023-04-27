@@ -6,7 +6,7 @@
 		<field name="inherit_id" ref="account.view_tax_form" />
 		<field name="arch" type="xml">
             <xpath expr="//field[@name='name']" position="after">
-                <field name="xero_tax_type_id" readonly="1" />
+                <field name="xero_tax_type_id"  />
                 <field name="xero_record_taxtype" invisible="1"/>
                 <!--<field name="xero_tax_status" readonly="1"/>-->
 

@@ -62,7 +62,7 @@ class SaleOrder(models.Model):
     def exportSaleOrder_cron(self):
         """export Quotations cron ODOO to XERO"""
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        valid_quotations = self.search([('create_date', '>', xero_config.export_record_after)])
+        valid_quotations = self.search([('date_order', '>', xero_config.export_record_after)])
         if valid_quotations:
             for quotation in valid_quotations:
                 if not quotation.xero_sale_id:

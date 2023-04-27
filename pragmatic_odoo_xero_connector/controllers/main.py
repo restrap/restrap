@@ -13,16 +13,14 @@ class xero_connector(http.Controller):
     @http.route('/get_auth_code', type="http", auth="public", website=True)
     def get_auth_code(self, **kwarg):
         if kwarg.get('code'):
-            # print("\n\nIn controllers code"+ kwarg+ "\n\n\n",kwarg.get('code'))
             access_token_url = 'https://identity.xero.com/connect/token'
 
-            xero_id = http.request.env['res.users'].search([('id', '=', http.request.uid)],limit=1).company_id
+            xero_id = http.request.env['res.users'].search([('id', '=', http.request.uid)], limit=1).company_id
             # xero_id.code = kwarg.get('code')
             client_id = xero_id.xero_client_id
             client_secret = xero_id.xero_client_secret
             redirect_uri = xero_id.xero_redirect_url
 
-            # print("base64.b64encode(client_id+""::::::::::::",base64.b64encode(client_id+":"+client_secret))
             data=client_id + ":" + client_secret
             encodedBytes = base64.b64encode(data.encode("utf-8"))
             encodedStr = str(encodedBytes, "utf-8")
@@ -51,7 +49,6 @@ class xero_connector(http.Controller):
                     'Authorization': "Bearer " + xero_id.xero_oauth_token,
                     'Content-Type': 'application/json'
                         }
-                # print("header1:::::::::::::::",header1)
 
                 xero_tenant_response=requests.request('GET','https://api.xero.com/connections', headers=header1)
 

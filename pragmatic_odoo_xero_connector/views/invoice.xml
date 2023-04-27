@@ -7,12 +7,16 @@
 		<field name="inherit_id" ref="account.view_move_form" />
 		<field name="arch" type="xml">
 			<xpath expr="//field[@name='partner_id']" position="after">
-                <field name="xero_invoice_id" readonly="1" attrs="{'invisible': [('xero_invoice_id','=',False)]}"/>
+                <field name="xero_bank_transaction_id" />
+                <field name="bank_transaction_type" />
+                <field name="xero_invoice_id" />
 				<field name="xero_invoice_number" readonly="1" attrs="{'invisible': [('xero_invoice_id','=',False)]}"/>
 			</xpath>
 
 			<xpath expr="//field[@name='invoice_date']" position="after">
                  <field name="tax_state"/>
+                <field name="inclusive" invisible="1"/>
+                <field name="sale_purchase" invisible="1"/>
 
             </xpath>
 			<xpath expr="/form/sheet/notebook/page[1]/field[@name='invoice_line_ids']/tree/field[@name='name']" position="after">
@@ -20,7 +24,7 @@
 		    </xpath>
 			<xpath expr="/form/sheet/notebook/page[1]/field[@name='invoice_line_ids']/tree/field[@name='tax_ids']" position="replace">
                 <field name="inclusive" invisible="1"/>
-                <field name="tax_ids" widget="many2many_tags" domain="[('type_tax_use','=','sale'),('price_include','=', inclusive)]" context="{'default_type_tax_use': 'sale'}" options="{'no_create': True}"/>
+                <field name="tax_ids" widget="many2many_tags" domain="[('type_tax_use','=',parent.sale_purchase),('price_include','=', parent.inclusive)]" context="{'default_type_tax_use': 'sale'}" options="{'no_create': True}"/>
             </xpath>
 
 			<!--<xpath expr="/form/sheet/notebook/page[1]/field[@name='invoice_line_ids']/tree/field[@name='discount']" position="attributes">-->

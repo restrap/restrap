@@ -16,7 +16,6 @@ class Account_Payment(models.Model):
     # @api.model
     # def create_log(self,xero_payment_id,invoice_id):
     #     xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-    #     # print("Payment create function.")
     #
     #     log_id = self.env['xero.log'].create(
     #         {
@@ -28,7 +27,6 @@ class Account_Payment(models.Model):
     #             'payment_status': 'The payment cannot be processed because the invoice is not open!',
     #         }
     #     )
-    #     print("log_id : ",log_id)
     #     return True
 
     # @api.model
@@ -163,7 +161,6 @@ class Account_Payment(models.Model):
                                               "Amount": self.amount,
                                               "Reference": self.name
                                             })
-        print('vals :----------------------> ',vals)
 
         return vals
 
@@ -195,6 +192,7 @@ class Account_Payment(models.Model):
         else:
             payments = self
 
+        _logger.info('Found Payments are : {}'.format(payments))
         for payment in payments:
             if payment.xero_payment_id:
                 raise ValidationError("Payment is already exported to Xero!")
@@ -236,7 +234,7 @@ class Account_Payment(models.Model):
                                     if element.get('ValidationErrors'):
                                         for err in element.get('ValidationErrors'):
                                             raise ValidationError(
-                                                '(Payment) Xero Exception : ' + err.get(
+                                                '(Payment) Xero Exception for Odoo Payment -  '+element.get('Reference')+'  =>'+ err.get(
                                                     'Message'))
                             elif response_data.get('Message'):
                                 raise ValidationError(
@@ -245,8 +243,6 @@ class Account_Payment(models.Model):
                             else:
                                 raise ValidationError(
                                     '(Payment) Xero Exception : please check xero logs in odoo for more details')
-
-
                 else:
                     raise ValidationError("Please Check Your Connection or error in application or refresh token..!!")
 
@@ -265,6 +261,6 @@ class Account_Payment(models.Model):
     @api.model
     def exportPayment_cron(self):
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        payment_records = self.env['account.payment'].search([('create_date', '>', xero_config.export_record_after),('xero_payment_id', '=', False)])
+        payment_records = self.env['account.payment'].search([('date', '>', xero_config.export_record_after), ('xero_payment_id', '=', False)])
         for payment in payment_records:
             payment.create_payment_in_xero()

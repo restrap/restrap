@@ -64,7 +64,6 @@ class ContactGroup(models.Model):
                     protected_url = 'https://api.xero.com/api.xro/2.0/ContactGroups'
 
                     data = requests.request('POST', url=protected_url, data=parsed_dict, headers=headers)
-                    # print("DATA : ", data, data.text)
                     if data.status_code == 200:
 
                         response_data = json.loads(data.text)
@@ -100,7 +99,6 @@ class ContactGroup(models.Model):
 
                     protected_url_2 = 'https://api.xero.com/api.xro/2.0/ContactGroups/'+a.xero_contact_group_id
                     data = requests.request('POST', url=protected_url_2, data=parsed_dict, headers=headers)
-                    # print("DATA : ", data, data.text)
                     if data.status_code == 200:
                        _logger.info(_("(UPDATE) - Exported successfully to XERO"))
 

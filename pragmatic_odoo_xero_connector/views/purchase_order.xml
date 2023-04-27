@@ -7,14 +7,14 @@
         <field name="inherit_id" ref="purchase.purchase_order_form" />
         <field name="arch" type="xml">
             <xpath expr="//field[@name='partner_id']" position="after">
-                 <field name="xero_purchase_id" readonly="1"/>
+                 <field name="xero_purchase_id" />
             </xpath>
             <xpath expr="//field[@name='date_order']" position="after">
                  <field name="tax_state"/>
 
             </xpath>
             <xpath expr="/form/sheet/notebook/page[1]/field[@name='order_line']/tree/field[@name='name']" position="after">
-                <field name="xero_purchase_line_id" string="Xero Id" readonly="1" invisible="1"/>
+                <field name="xero_purchase_line_id" string="Xero Id"  invisible="1"/>
             </xpath>
 
             <xpath expr="/form/sheet/notebook/page[1]/field[@name='order_line']/tree/field[@name='taxes_id']" position="replace">

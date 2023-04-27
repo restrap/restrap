@@ -1,11 +1,13 @@
 import base64
 import json
 import logging
+from odoo.tests import Form
 import math
 from datetime import date, datetime
 import datetime
 from math import ceil, floor
-
+from dateutil import parser
+import threading
 import requests
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
@@ -31,10 +33,12 @@ class ResCompany(models.Model):
     xero_access_token_url = fields.Char('Access Token URL',
                                         default="https://identity.xero.com/connect/token",
                                         help="One of the redirect URIs listed for this project in the developer dashboard used to get the verifier code.")
-    chrome_executable_path = fields.Char('Executable Path', copy=False, help='Add Executable path of your chromedriver')
+    chrome_executable_path = fields.Char(
+        'Executable Path', copy=False, help='Add Executable path of your chromedriver')
     xero_tenant_id_url = fields.Char('Tenant ID URL', default="https://api.xero.com/connections",
                                      help="Check the full set of tenants you've been authorized to access.")
-    xero_redirect_url = fields.Char('Redirect URL', help="http://localhost:8069/get_auth_code")
+    xero_redirect_url = fields.Char(
+        'Redirect URL', help="http://localhost:8069/get_auth_code")
 
     # used for api calling, generated during authorization process.
     # xero_verifier_code = fields.Char('Verifier Code',help="The token that must be used to access the Xero API. Access token expires in 1800 seconds.")
@@ -44,17 +48,29 @@ class ResCompany(models.Model):
     xero_company_id = fields.Char('Xero Company ID')
     xero_country_name = fields.Char('Xero Country Name')
     x_invoice_date = fields.Date(string='Import Invoice From', copy=False)
-    x_purchaseorder_date = fields.Date(string='Import PurchaseOrder From', copy=False)
-    x_salesorder_date = fields.Date(string='Import SalesOrder From', copy=False)
+    x_purchaseorder_date = fields.Date(
+        string='Import PurchaseOrder From', copy=False)
+    x_salesorder_date = fields.Date(
+        string='Import SalesOrder From', copy=False)
+
+    spend_money_date = fields.Date(
+        string='Import Spend Money From', copy=False)
+
+    receive_money_date = fields.Date(
+        string='Import Receive Money From', copy=False)
 
     x_journal_date = fields.Date(string='Import Journal From', copy=False)
 
-    x_credit_note_date = fields.Date(string='Import Credit Note From', copy=False)
+    x_credit_note_date = fields.Date(
+        string='Import Credit Note From', copy=False)
     x_payments_date = fields.Date(string='Import Payments From', copy=False)
-    x_prepayments_date = fields.Date(string='Import Prepayments From', copy=False)
-    x_overpayments_date = fields.Date(string='Import Overpayments From', copy=False)
+    x_prepayments_date = fields.Date(
+        string='Import Prepayments From', copy=False)
+    x_overpayments_date = fields.Date(
+        string='Import Overpayments From', copy=False)
 
-    xero_company_name = fields.Char('Xero Company Name/Organisation', help="Add name of your organisation.")
+    xero_company_name = fields.Char(
+        'Xero Company Name/Organisation', help="Add name of your organisation.")
     # log_ids = fields.One2many('xero.log', 'company_id', ondelete="cascade", string='Logs')
     xero_tenant_id = fields.Char('Tenant Id')
     refresh_token_xero = fields.Char('Refresh Token')
@@ -63,24 +79,57 @@ class ResCompany(models.Model):
     default_account = fields.Many2one('account.account',
                                       help='This Account will be attached to the invoice lines which does not contain quantity,unit price and account',
                                       string='Default Account')
-    overpayment_journal = fields.Many2one('account.journal', help='Overpayment Journal')
-    prepayment_journal = fields.Many2one('account.journal', help='Prepayment Journal')
-    xero_tenant_name = fields.Char('Xero Company', copy=False)
-    manual_journal = fields.Many2one('account.journal', help="Manual Journal" )
+    overpayment_journal = fields.Many2one(
+        'account.journal', help='Overpayment Journal')
 
-    export_invoice_without_product = fields.Boolean('Export Invoices with description only', copy=False)
-    export_bill_without_product = fields.Boolean('Export Bills with description only', copy=False)
+    default_prod_po = fields.Many2one(
+        'product.product', help='Default Product For PO', string='Default PO Product')
+    default_prod_so = fields.Many2one(
+        'product.product', help='Default Product For SO', string='Default SO Product')
+    set_accoung_tag = fields.Char(help='Default Product For SO', string='Analytic Account Tag (Note: Separated by , if multiple)')
+
+    prepayment_journal = fields.Many2one(
+        'account.journal', help='Prepayment Journal')
+    xero_tenant_name = fields.Char('Xero Company', copy=False)
+    manual_journal = fields.Many2one('account.journal', help="Manual Journal")
+
+    export_invoice_without_product = fields.Boolean(
+        'Export Invoices with description only', copy=False)
+    export_bill_without_product = fields.Boolean(
+        'Export Bills with description only', copy=False)
     invoice_status = fields.Selection([('draft', 'DRAFT'), ('authorised', 'AUTHORISED')], 'Invoice/Bill Status',
                                       default='authorised')
 
     set_expence_account_for_bill = fields.Boolean(related="export_bill_without_product",
                                                   string='Set Expence Account on Bill Line level', copy=False)
 
-    non_tracked_item = fields.Boolean('Export Stockable Product as Non Tracked Items', copy=False)
+    non_tracked_item = fields.Boolean(
+        'Export Stockable Product as Non Tracked Items', copy=False)
 
     export_record_after = fields.Date("Export Records After", copy=False)
 
-    map_invoice_reference = fields.Selection([('customer_ref','Customer Reference'),('payment_ref','Payment Reference')], string="Map reference field in xero with", default="customer_ref")
+    xero_last_imported_invoice_page = fields.Integer(
+        'Last Imported Invoice Page', copy=False)
+    xero_last_imported_po_page = fields.Integer(
+        'Last Imported PO Page', copy=False)
+    xero_last_imported_credit_note_page = fields.Integer(
+        'Last Imported Credit Note Page', copy=False)
+    # xero_last_imported_payment_page = fields.Integer('Last Imported Payment Page', copy=False)
+    # xero_last_imported_prepayment_page = fields.Integer('Last Imported PrePayment Page', copy=False)
+    # xero_last_imported_overpayment_page = fields.Integer('Last Imported OverPayment Page', copy=False)
+    xero_last_imported_so_page = fields.Integer(
+        'Last Imported SO Page', copy=False)
+    xero_last_imported_spnd_mny_page = fields.Integer(
+        'Last Imported Spend Money Page', copy=False)
+    xero_last_imported_rcv_mny_page = fields.Integer(
+        'Last Imported Receive Money Page', copy=False)
+    xero_last_imported_manual_journal_page = fields.Integer(
+        'Last Imported Manual Journal Page', copy=False)
+
+    map_invoice_reference = fields.Selection([('customer_ref', 'Customer Reference'), (
+        'payment_ref', 'Payment Reference')], string="Map reference field in xero with", default="customer_ref")
+    skip_jnrl_entry = fields.Boolean(
+        'Skip Journal Entry', copy=False)
 
     def login(self):
         if not self.id == self.env.user.company_id.id:
@@ -92,7 +141,8 @@ class ResCompany(models.Model):
         if not self.xero_client_secret:
             raise ValidationError("Please Enter Client Secret")
 
-        requests_url = 'https://login.xero.com/identity/connect/authorize?' + 'response_type=code&' + 'client_id=' + self.xero_client_id + '&redirect_uri=' + self.xero_redirect_url + '&scope= openid profile email accounting.transactions accounting.settings accounting.settings.read accounting.contacts payroll.employees  offline_access'
+        requests_url = 'https://login.xero.com/identity/connect/authorize?' + 'response_type=code&' + 'client_id=' + self.xero_client_id + '&redirect_uri=' + self.xero_redirect_url + \
+                       '&scope= openid profile email accounting.transactions accounting.settings accounting.settings.read accounting.contacts payroll.employees  offline_access'
 
         return {
             "type": "ir.actions.act_url",
@@ -102,11 +152,13 @@ class ResCompany(models.Model):
 
     def refresh_token(self):
         try:
-            xero_id = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+            xero_id = self.env['res.users'].search(
+                [('id', '=', self._uid)], limit=1).company_id
 
             if not xero_id:
                 user_obj = self.env['res.users'].browse(self._uid)
-                raise ValidationError('Company not found for User Name : ' + user_obj.name + 'and User Id : ' + self._uid)
+                raise ValidationError(
+                    'Company not found for User Name : ' + user_obj.name + 'and User Id : ' + self._uid)
 
             if not xero_id.id == self.env.user.company_id.id:
                 raise ValidationError(
@@ -133,23 +185,28 @@ class ResCompany(models.Model):
             access_token = requests.post(url, data=data_token, headers=headers)
             parsed_token_response = json.loads(access_token.text)
 
-            _logger.info('\n\nResponse : \n\n{} {} '.format(access_token,parsed_token_response))
+            _logger.info('\n\nResponse : \n\n{} {} '.format(
+                access_token, parsed_token_response))
 
             if parsed_token_response:
-                xero_id.refresh_token_xero = parsed_token_response.get('refresh_token')
-                xero_id.xero_oauth_token = parsed_token_response.get('access_token')
+                xero_id.refresh_token_xero = parsed_token_response.get(
+                    'refresh_token')
+                xero_id.xero_oauth_token = parsed_token_response.get(
+                    'access_token')
 
                 if access_token.status_code == 200:
                     _logger.info(_("(UPDATE) - Token generated successfully"))
 
                 elif access_token.status_code == 401:
-                    _logger.info(_("Time Out.\nPlease Check Your Connection or error in application or refresh token..!!"))
+                    _logger.info(
+                        _("Time Out.\nPlease Check Your Connection or error in application or refresh token..!!"))
                 elif access_token.status_code == 400:
                     if parsed_token_response.get('error'):
-                        raise ValidationError(parsed_token_response.get('error'))
+                        raise ValidationError(
+                            parsed_token_response.get('error'))
         except Exception as e:
-            _logger.info("Error : %s"%e)
-            raise ValidationError("Error : %s"%e)
+            _logger.info("Error : %s" % e)
+            raise ValidationError("Error : %s" % e)
 
     def get_headers(self):
         headers = {}
@@ -187,7 +244,8 @@ class ResCompany(models.Model):
             self.create_account_in_odoo(data)
             self._cr.commit()
             self.import_tracking_categories()
-            success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+            success_form = self.env.ref(
+                'pragmatic_odoo_xero_connector.import_successfull_view', False)
             return {
                 'name': _('Notification'),
                 'type': 'ir.actions.act_window',
@@ -199,7 +257,8 @@ class ResCompany(models.Model):
                 'target': 'new',
             }
         elif data.status_code == 401:
-            raise ValidationError('Time Out..!!\n Please check your connection or error in application.')
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
 
     @api.model
     def create_account_in_odoo(self, data):
@@ -236,12 +295,15 @@ class ResCompany(models.Model):
             dict_e['name'] = acc.get('Name')
 
         if acc.get('TaxType'):
-            tax_type = self.env['xero.tax.type'].search([('xero_tax_type', '=', acc.get('TaxType'))])
+            tax_type = self.env['xero.tax.type'].search(
+                [('xero_tax_type', '=', acc.get('TaxType'))])
             if tax_type:
                 dict_e['xero_tax_type_for_accounts'] = tax_type.id
             else:
-                self.env['xero.tax.type'].create({'xero_tax_type': acc.get('TaxType')})
-                tax_type = self.env['xero.tax.type'].search([('xero_tax_type', '=', acc.get('TaxType'))])
+                self.env['xero.tax.type'].create(
+                    {'xero_tax_type': acc.get('TaxType')})
+                tax_type = self.env['xero.tax.type'].search(
+                    [('xero_tax_type', '=', acc.get('TaxType'))])
                 if tax_type:
                     dict_e['xero_tax_type_for_accounts'] = tax_type.id
 
@@ -271,7 +333,8 @@ class ResCompany(models.Model):
                                  }
             acc_type_odoo = self.env['account.account.type']
             if acc.get('Type') in account_type_odoo:
-                user_type = acc_type_odoo.search([('name', '=', account_type_odoo.get(acc.get('Type')))])
+                user_type = acc_type_odoo.search(
+                    [('name', '=', account_type_odoo.get(acc.get('Type')))])
                 dict_e['user_type_id'] = user_type.id
             else:
                 acc_type_odoo = self.env['account.account.type']
@@ -305,7 +368,8 @@ class ResCompany(models.Model):
         if not account_account:
 
             '''If Account is not present we create it'''
-            _logger.info("ATTEMPTING TO CREATE RECORD WITH DATA {}".format(dict_e))
+            _logger.info(
+                "ATTEMPTING TO CREATE RECORD WITH DATA {}".format(dict_e))
             if 'code' in dict_e and dict_e.get('code'):
                 dept_create = account_account.create(dict_e)
                 if dept_create:
@@ -315,9 +379,11 @@ class ResCompany(models.Model):
                     raise ValidationError(
                         'Account could not be updated \n Please check Account ' + dict_e['code'] + ' in Xero.')
             else:
-                _logger.error("code key is not there in data dict for create, skipping the record.")
+                _logger.error(
+                    "code key is not there in data dict for create, skipping the record.")
         else:
-            _logger.info("ATTEMPTING TO UPDATE RECORD WITH DATA {}".format(dict_e))
+            _logger.info(
+                "ATTEMPTING TO UPDATE RECORD WITH DATA {}".format(dict_e))
             if 'code' in dict_e and dict_e.get('code'):
                 if 'user_type_id' in dict_e:
                     del dict_e['user_type_id']
@@ -331,7 +397,8 @@ class ResCompany(models.Model):
                     raise ValidationError(
                         'Account could not be updated \n Please check Account ' + dict_e['code'] + ' in Xero.')
             else:
-                _logger.error("code key is not there in data dict for update, skipping the record.")
+                _logger.error(
+                    "code key is not there in data dict for update, skipping the record.")
 
     def import_tracking_categories(self, Tracking_categ_id=None):
         """IMPORT TRECKING CATEGORIES FROM XERO TO ODOO"""
@@ -339,7 +406,8 @@ class ResCompany(models.Model):
         if Tracking_categ_id is None:
             url = 'https://api.xero.com/api.xro/2.0/TrackingCategories'
         else:
-            url = 'https://api.xero.com/api.xro/2.0/TrackingCategories?IDs={}'.format(Tracking_categ_id)
+            url = 'https://api.xero.com/api.xro/2.0/TrackingCategories?IDs={}'.format(
+                Tracking_categ_id)
 
         data = self.get_data(url)
         # print(url, '\n\n\nGET Response For Tracking Id : ', data.text)
@@ -349,48 +417,101 @@ class ResCompany(models.Model):
             if parsed_dict.get('TrackingCategories'):
                 account_id = None
                 for categ in parsed_dict.get('TrackingCategories'):
-                    _logger.info('\n\nPrepearing Import of Analytic Account Group : %s'%categ.get('Name') )
+                    _logger.info(
+                        '\n\nPrepearing Import of Analytic Account : %s' % categ.get('Name'))
                     if categ.get('TrackingCategoryID'):
-                        group_id = self.env['account.analytic.group'].search([('xero_tracking_id', '=', categ.get('TrackingCategoryID'))])
-
-                    if not group_id:
-
-                        group = {}
                         account = {}
-
-                        if categ.get('Name'):
-                            group.update({
-                                'name': categ.get('Name'),
-                                'description': categ.get('Name'),
-                                'xero_tracking_id': categ.get('TrackingCategoryID')
-                            })
-                            group_id = self.env['account.analytic.group'].create(group)
-                            self._cr.commit()
                         account_id = None
-                        _logger.info('\n\n Group Dict : %s \n\n'%group)
-                        if group_id:
-                            if categ.get('Options'):
-                                options = categ.get('Options')
-                                for option in options:
-                                    if option.get('Name'):
-                                        account.update({
-                                            'name': option.get('Name'),
-                                            'xero_tracking_opt_id': option.get('TrackingOptionID'),
-                                            'group_id': group_id.id
-                                        })
-                                        account_id = self.env['account.analytic.account'].create(account)
-                                        self._cr.commit()
-                                        _logger.info('\n\n Group Account Dict : %s \n\n' % account)
+                        if categ.get('Options'):
+                            options = categ.get('Options')
+                            for option in options:
+                                if option.get('Name'):
+                                    count = 0
+                                    if self.set_accoung_tag:
+                                        set_accoung_tag = list(self.set_accoung_tag.split(","))
+                                        for account_tag in set_accoung_tag:
+                                            if option.get('Name').upper().startswith(account_tag.upper()):
+                                                count += 1
+                                        if count > 0:
+                                            account_obj = self.env['account.analytic.tag'].search(
+                                                [('name', '=', option.get('Name')),
+                                                 ('company_id', '=', self.id)], limit=1)
+                                            if account_obj:
+                                                account_obj.write({
+                                                    'xero_tracking_opt_id': option.get('TrackingOptionID'),
+                                                    'company_id': self.id
+                                                })
+                                            else:
+                                                account.update({
+                                                    'name': option.get('Name'),
+                                                    'xero_tracking_opt_id': option.get('TrackingOptionID'),
+                                                    'company_id': self.id
+                                                    # 'group_id': group_id.id
+                                                })
+                                                account_id = self.env[
+                                                    'account.analytic.tag'].create(account)
+                                                self._cr.commit()
+                                                _logger.info(
+                                                    '\n\n Group Account Dict : %s \n\n' % account)
+                                        else:
+                                            account_obj = self.env['account.analytic.group'].search(
+                                                [('name', '=', option.get('Name')),
+                                                 ('company_id', '=', self.id)], limit=1)
+                                            if account_obj:
+                                                account_obj.write({
+                                                    'xero_tracking_id': option.get('TrackingOptionID'),
+                                                    'company_id': self.id
+                                                })
+                                            else:
+                                                account.update({
+                                                    'name': option.get('Name'),
+                                                    'xero_tracking_id': option.get('TrackingOptionID'),
+                                                    'company_id': self.id
+                                                    # 'group_id': group_id.id
+                                                })
+                                                account_id = self.env[
+                                                    'account.analytic.group'].create(account)
+                                                self._cr.commit()
+                                                _logger.info(
+                                                    '\n\n Group Account Dict : %s \n\n' % account)
+                                    else:
+                                        account_obj = self.env['account.analytic.group'].search(
+                                            [('name', '=', option.get('Name')),
+                                             ('company_id', '=', self.id)], limit=1)
+                                        if account_obj:
+                                            account_obj.write({
+                                                'xero_tracking_id': option.get('TrackingOptionID'),
+                                                'company_id': self.id
+                                            })
+                                        else:
+                                            account.update({
+                                                'name': option.get('Name'),
+                                                'xero_tracking_id': option.get('TrackingOptionID'),
+                                                'company_id': self.id
+                                                # 'group_id': group_id.id
+                                            })
+                                            account_id = self.env[
+                                                'account.analytic.group'].create(account)
+                                            self._cr.commit()
+                                            _logger.info(
+                                                '\n\n Group Account Dict : %s \n\n' % account)
 
-                            else:
-                                _logger.info('No Options available for %s' % categ.get('Name'))
 
-                        if account_id or group_id:
+
+
+
+                        else:
+                            _logger.info(
+                                'No Options available for %s' % categ.get('Name'))
+
+                        if account_id:
                             group_flag += 1
-                            _logger.info(' %s Successfully Imported' % categ.get('Name'))
+                            _logger.info(
+                                ' %s Successfully Imported' % categ.get('Name'))
 
                     else:
-                        _logger.info('Category %s already imported '%categ.get('Name'))
+                        _logger.info(
+                            'Category %s already imported ' % categ.get('Name'))
 
                 if group_flag != 0:
                     return account_id
@@ -398,22 +519,20 @@ class ResCompany(models.Model):
                     _logger.info('No any Record Import...')
 
         elif data.status_code == 401:
-            raise ValidationError('Time Out..!!\n Please check your connection or error in application.')
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
 
     def create_categ_in_odoo(self, categ, group_flag=0):
         # print('\n\n ______________________________________Category Line : \n\n', categ)
-        _logger.info('\n\nPrepearing Import of Analytic Account Group : %s' % categ.get('Name'))
+        _logger.info(
+            '\n\nPrepearing Import of Analytic Account Group : %s' % categ.get('Name'))
 
         group_id = None
-
-        if categ.get('TrackingCategoryID'):
-            group_id = self.env['account.analytic.group'].search(
-                [('xero_tracking_id', '=', categ.get('TrackingCategoryID'))])
         account_id = None
-        group = {}
         account = {}
 
-        url = " https://api.xero.com/api.xro/2.0/TrackingCategories/{}".format(categ.get('TrackingCategoryID'))
+        url = " https://api.xero.com/api.xro/2.0/TrackingCategories/{}".format(
+            categ.get('TrackingCategoryID'))
         data = self.get_data(url)
         status = False
         ChildOptions = None
@@ -422,57 +541,201 @@ class ResCompany(models.Model):
             # print('parsed Dict :++++++++++++++++++ \n\n', parsed_dict)
             catgories = parsed_dict.get('TrackingCategories')
             if catgories[0].get('Status') == 'ACTIVE':
-               status = True
+                status = True
             ChildOptions = catgories[0].get('Options')
 
-        if not group_id:
-            if categ.get('Name'):
-                group.update({
-                    'name': categ.get('Name'),
-                    'is_active': status,
-                    'description': categ.get('Name'),
-                    'xero_tracking_id': categ.get('TrackingCategoryID')
-                })
-                group_id = self.env['account.analytic.group'].create(group)
-                self._cr.commit()
+        if categ.get('TrackingCategoryID'):
+            if ChildOptions:
+                for option in ChildOptions:
+                    if option.get('TrackingOptionID') == categ.get('TrackingOptionID'):
+                        if option.get('Status') == 'ACTIVE':
+                            isActive = True
+                        else:
+                            isActive = False
 
-            _logger.info('\n\n Group Dict : %s \n\n' % group)
-
-        if group_id:
-            if categ.get('TrackingOptionID'):
-                if ChildOptions:
-                    for option in ChildOptions:
-                        if option.get('TrackingOptionID') == categ.get('TrackingOptionID'):
-                            if option.get('Status') == 'ACTIVE':
-                                isActive = True
-                            else:
-                                isActive = False
-
-                            account_id = self.env['account.analytic.account'].search([('xero_tracking_opt_id', '=', categ.get('TrackingOptionID'))])
-                            if not account_id:
-                                account.update({
-                                    'name': categ.get('Option'),
-                                    'is_active': isActive,
-                                    'xero_tracking_opt_id': categ.get('TrackingOptionID'),
-                                    'group_id': group_id.id
-                                })
-                                account_id = self.env['account.analytic.account'].create(account)
-                                self._cr.commit()
-                                _logger.info('\n\n Group Account Dict : %s \n\n' % account)
-                            else:
-                                _logger.info('\n\n Account Already Exists : %s \n\n' % categ.get('Option'))
-                else:
-                    _logger.info('\n\nNo child category present for this ')
             else:
-               _logger.info('No Options available for %s' % categ.get('Name'))
+                _logger.info('\n\nNo child category present for this ')
+        else:
+            _logger.info('No Options available for %s' % categ.get('Name'))
 
-            if account_id or group_id:
-                _logger.info(' %s Successfully Imported' % categ.get('Name'))
-                return account_id
+        analytic_obj = self.env['account.analytic.tag']
+        account_id = analytic_obj.search(
+            [('name', '=', categ['Option']), ('xero_tracking_opt_id', '!=', False), ('company_id', '=', self.id)],
+            limit=1)
+
+        if not account_id:
+            self.import_tracking_categories(categ['TrackingCategoryID'])
+            account_id = analytic_obj.search(
+                [('name', '=', categ['Option']), ('xero_tracking_opt_id', '!=', False), ('company_id', '=', self.id)],
+                limit=1)
+            _logger.info(
+                '\n\n Group Account Dict : %s \n\n' % account)
+        else:
+            _logger.info(
+                '\n\n Account Already Exists : %s \n\n' % categ.get('Option'))
+        if account_id:
+            _logger.info(' %s Successfully Imported' % categ.get('Name'))
+            return account_id
 
         else:
             _logger.info('Category %s already imported ' % categ.get('Name'))
 
+    # def import_tracking_categories(self, Tracking_categ_id=None):
+    #     """IMPORT TRECKING CATEGORIES FROM XERO TO ODOO"""
+    #
+    #
+    #     if Tracking_categ_id is None:
+    #         url = 'https://api.xero.com/api.xro/2.0/TrackingCategories'
+    #     else:
+    #         url = 'https://api.xero.com/api.xro/2.0/TrackingCategories?IDs={}'.format(
+    #             Tracking_categ_id)
+    #
+    #     data = self.get_data(url)
+    #     # print(url, '\n\n\nGET Response For Tracking Id : ', data.text)
+    #     group_flag = 0
+    #     if data.status_code == 200:
+    #         parsed_dict = json.loads(data.text)
+    #         if parsed_dict.get('TrackingCategories'):
+    #             account_id = None
+    #             for categ in parsed_dict.get('TrackingCategories'):
+    #                 _logger.info(
+    #                     '\n\nPrepearing Import of Analytic Account : %s' % categ.get('Name'))
+    #                 if categ.get('TrackingCategoryID'):
+    #                     group_id = self.env['account.analytic.account'].search(
+    #                         [('xero_tracking_opt_id', '=', categ.get('TrackingCategoryID'))])
+    #
+    #                 if not group_id:
+    #
+    #                     group = {}
+    #                     account = {}
+    #
+    #                     if categ.get('Name'):
+    #                         group.update({
+    #                             'name': categ.get('Name'),
+    #                             # 'description': categ.get('Name'),
+    #                             'xero_tracking_opt_id': categ.get('TrackingCategoryID')
+    #                         })
+    #                         group_id = self.env[
+    #                             'account.analytic.account'].create(group)
+    #                         self._cr.commit()
+    #                     account_id = None
+    #                     _logger.info('\n\n Group Dict : %s \n\n' % group)
+    #                     if group_id:
+    #                         if categ.get('Options'):
+    #                             options = categ.get('Options')
+    #                             for option in options:
+    #                                 if option.get('Name'):
+    #                                     account.update({
+    #                                         'name': option.get('Name'),
+    #                                         'xero_tracking_opt_id': option.get('TrackingOptionID'),
+    #                                         # 'group_id': group_id.id
+    #                                     })
+    #                                     account_id = self.env[
+    #                                         'account.analytic.tag'].create(account)
+    #                                     self._cr.commit()
+    #                                     _logger.info(
+    #                                         '\n\n Group Account Dict : %s \n\n' % account)
+    #
+    #                         else:
+    #                             _logger.info(
+    #                                 'No Options available for %s' % categ.get('Name'))
+    #
+    #                     if account_id or group_id:
+    #                         group_flag += 1
+    #                         _logger.info(
+    #                             ' %s Successfully Imported' % categ.get('Name'))
+    #
+    #                 else:
+    #                     _logger.info(
+    #                         'Category %s already imported ' % categ.get('Name'))
+    #
+    #             if group_flag != 0:
+    #                 return account_id
+    #             else:
+    #                 _logger.info('No any Record Import...')
+    #
+    #     elif data.status_code == 401:
+    #         raise ValidationError(
+    #             'Time Out..!!\n Please check your connection or error in application.')
+
+    # def create_categ_in_odoo(self, categ, group_flag=0):
+    #     # print('\n\n ______________________________________Category Line : \n\n', categ)
+    #     _logger.info(
+    #         '\n\nPrepearing Import of Analytic Account Group : %s' % categ.get('Name'))
+    #
+    #     group_id = None
+    #
+    #     if categ.get('TrackingCategoryID'):
+    #         group_id = self.env['account.analytic.group'].search(
+    #             [('xero_tracking_id', '=', categ.get('TrackingCategoryID'))])
+    #     account_id = None
+    #     group = {}
+    #     account = {}
+    #
+    #     url = " https://api.xero.com/api.xro/2.0/TrackingCategories/{}".format(
+    #         categ.get('TrackingCategoryID'))
+    #     data = self.get_data(url)
+    #     status = False
+    #     ChildOptions = None
+    #     if data.status_code == 200:
+    #         parsed_dict = json.loads(data.text)
+    #         # print('parsed Dict :++++++++++++++++++ \n\n', parsed_dict)
+    #         catgories = parsed_dict.get('TrackingCategories')
+    #         if catgories[0].get('Status') == 'ACTIVE':
+    #             status = True
+    #         ChildOptions = catgories[0].get('Options')
+    #
+    #     if not group_id:
+    #         if categ.get('Name'):
+    #             group.update({
+    #                 'name': categ.get('Name'),
+    #                 'is_active': status,
+    #                 'description': categ.get('Name'),
+    #                 'xero_tracking_id': categ.get('TrackingCategoryID')
+    #             })
+    #             group_id = self.env['account.analytic.group'].create(group)
+    #             self._cr.commit()
+    #
+    #         _logger.info('\n\n Group Dict : %s \n\n' % group)
+    #
+    #     if group_id:
+    #         if categ.get('TrackingOptionID'):
+    #             if ChildOptions:
+    #                 for option in ChildOptions:
+    #                     if option.get('TrackingOptionID') == categ.get('TrackingOptionID'):
+    #                         if option.get('Status') == 'ACTIVE':
+    #                             isActive = True
+    #                         else:
+    #                             isActive = False
+    #
+    #                         account_id = self.env['account.analytic.account'].search(
+    #                             [('xero_tracking_opt_id', '=', categ.get('TrackingOptionID'))])
+    #                         if not account_id:
+    #                             account.update({
+    #                                 'name': categ.get('Option'),
+    #                                 'is_active': isActive,
+    #                                 'xero_tracking_opt_id': categ.get('TrackingOptionID'),
+    #                                 'group_id': group_id.id
+    #                             })
+    #                             account_id = self.env[
+    #                                 'account.analytic.account'].create(account)
+    #                             self._cr.commit()
+    #                             _logger.info(
+    #                                 '\n\n Group Account Dict : %s \n\n' % account)
+    #                         else:
+    #                             _logger.info(
+    #                                 '\n\n Account Already Exists : %s \n\n' % categ.get('Option'))
+    #             else:
+    #                 _logger.info('\n\nNo child category present for this ')
+    #         else:
+    #             _logger.info('No Options available for %s' % categ.get('Name'))
+    #
+    #         if account_id or group_id:
+    #             _logger.info(' %s Successfully Imported' % categ.get('Name'))
+    #             return account_id
+    #
+    #     else:
+    #         _logger.info('Category %s already imported ' % categ.get('Name'))
 
     def import_tax(self):
         """IMPORT TAX FROM XERO TO ODOO"""
@@ -486,7 +749,8 @@ class ResCompany(models.Model):
 
             if parsed_dict.get('TaxRates'):
 
-                xero_id = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+                xero_id = self.env['res.users'].search(
+                    [('id', '=', self._uid)], limit=1).company_id
 
                 record = parsed_dict.get('TaxRates')
                 if isinstance(record, (dict,)):
@@ -503,7 +767,8 @@ class ResCompany(models.Model):
                         else:
                             self.create_imported_tax(acc)
 
-                success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                success_form = self.env.ref(
+                    'pragmatic_odoo_xero_connector.import_successfull_view', False)
                 return {
                     'name': _('Notification'),
                     'type': 'ir.actions.act_window',
@@ -518,7 +783,8 @@ class ResCompany(models.Model):
                 raise ValidationError('There is no any tax present in XERO.')
 
         elif data.status_code == 401:
-            raise ValidationError('Time Out..!!\n Please check your connection or error in application.')
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
 
     @api.model
     def create_imported_tax(self, acc):
@@ -546,7 +812,8 @@ class ResCompany(models.Model):
         if acc.get('Name'):
             dict_t['name'] = acc.get('Name')
         if acc.get('EffectiveRate') or acc.get('DisplayTaxRate'):
-            dict_t['amount'] = acc.get('EffectiveRate') or acc.get('DisplayTaxRate')
+            dict_t['amount'] = acc.get(
+                'EffectiveRate') or acc.get('DisplayTaxRate')
         else:
             dict_t['amount'] = 0.0
 
@@ -570,7 +837,7 @@ class ResCompany(models.Model):
                 #                     if i.get('Name'):
                 #                         individual_tax = self.env['account.tax'].search(
                 #                             [('name', '=', i.get('Name')), ('company_id', '=', self.id)], limit=1)
-                #                         # print("individual_tax : ",individual_tax)
+                # print("individual_tax : ",individual_tax)
                 #                         if len(individual_tax) > 1:
                 #                             raise UserError('Recursion found for tax component' + i.get('Name') + '.')
                 #                         dict_l = {}
@@ -602,24 +869,30 @@ class ResCompany(models.Model):
                     dict_t.update({'name': acc.get('Name')})
                     dict_t.update({'type_tax_use': 'sale'})
                     _logger.info(_(' Creating Sale Tax : {}'.format(dict_t)))
-                    account_tax_create_s = self.env['account.tax'].create(dict_t)
+                    account_tax_create_s = self.env[
+                        'account.tax'].create(dict_t)
 
                     if account_tax_create_s:
                         dict_t['name'] = acc.get('Name') + '(Inc)'
                         dict_t.update({'price_include': True})
-                        _logger.info(_(' Creating Inc Sale Tax : {}'.format(dict_t)))
-                        inclusive_sale_tax_create = self.env['account.tax'].create(dict_t)
+                        _logger.info(
+                            _(' Creating Inc Sale Tax : {}'.format(dict_t)))
+                        inclusive_sale_tax_create = self.env[
+                            'account.tax'].create(dict_t)
 
                     dict_t.update({'name': acc.get('Name')})
                     dict_t.update({'type_tax_use': 'purchase'})
                     dict_t.update({'price_include': False})
-                    _logger.info(_(' Creating Purchase Tax : {}'.format(dict_t)))
+                    _logger.info(
+                        _(' Creating Purchase Tax : {}'.format(dict_t)))
                     account_tax_create = self.env['account.tax'].create(dict_t)
                     if account_tax_create:
                         dict_t.update({'price_include': True})
                         dict_t['name'] = acc.get('Name') + '(Inc)'
-                        _logger.info(_(' Creating Inc Purchase Tax : {}'.format(dict_t)))
-                        inclusive_purchase_tax_create = self.env['account.tax'].create(dict_t)
+                        _logger.info(
+                            _(' Creating Inc Purchase Tax : {}'.format(dict_t)))
+                        inclusive_purchase_tax_create = self.env[
+                            'account.tax'].create(dict_t)
 
                 else:
                     account_tax_name.write(dict_t)
@@ -633,7 +906,7 @@ class ResCompany(models.Model):
                 #         tax_c = acc.get('TaxComponents')
                 #         if isinstance(tax_c, (list,)):
                 #             if len(tax_c) >= 1:
-                #                 dict_t['amount_type'] = 'percent' # 'group'
+                # dict_t['amount_type'] = 'percent' # 'group'
                 #                 list_t = []
                 #
                 #                 for i in tax_c:
@@ -665,8 +938,8 @@ class ResCompany(models.Model):
                 #                                 dict_t['children_tax_ids'] = list_t
                 #
                 #                         else:
-                #                             # create_p = individual_tax.write(dict_l)
-                #                             # if create_p:
+                # create_p = individual_tax.write(dict_l)
+                # if create_p:
                 #                             list_tax = list_t.append((4, individual_tax.id))
                 #                             dict_t['children_tax_ids'] = list_t
                 _logger.info(_('\nFinal Tax Update Dict : {}'.format(dict_t)))
@@ -681,7 +954,8 @@ class ResCompany(models.Model):
         data = self.get_data(url)
         res = self.create_products(data)
         if res:
-            success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+            success_form = self.env.ref(
+                'pragmatic_odoo_xero_connector.import_successfull_view', False)
             return {
                 'name': _('Notification'),
                 'type': 'ir.actions.act_window',
@@ -698,7 +972,8 @@ class ResCompany(models.Model):
         """IMPORT THE SPECIFIC PRODUCT"""
         _logger.info("FETCHING THE REQUIRED PRODUCT")
 
-        url = 'https://api.xero.com/api.xro/2.0/items/' + str(prod_internal_code)
+        url = 'https://api.xero.com/api.xro/2.0/items/' + \
+              str(prod_internal_code)
         data = self.get_data(url)
         self.create_products(data)
 
@@ -720,9 +995,11 @@ class ResCompany(models.Model):
                         self.create_imported_products(item)
                 return True
             else:
-                raise ValidationError('There is no any product present in XERO.')
+                raise ValidationError(
+                    'There is no any product present in XERO.')
         elif data.status_code == 401:
-            raise ValidationError('Time Out..!!\n Please check your connection or error in application.')
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
 
     @api.model
     def create_imported_products(self, item):
@@ -736,7 +1013,8 @@ class ResCompany(models.Model):
         if item.get('Name'):
             dict_create.update({'name': item.get('Name')})
         else:
-            _logger.info("Product Name is not defined : PRODUCT CODE = %s ", item.get('Code'))
+            _logger.info(
+                "Product Name is not defined : PRODUCT CODE = %s ", item.get('Code'))
 
         dict_create.update({'default_code': item.get('Code')})
 
@@ -764,13 +1042,15 @@ class ResCompany(models.Model):
                 acc_id_s = self.env['account.account'].search(
                     [('code', '=', item.get('SalesDetails').get('AccountCode')), ('company_id', '=', self.id)])
                 if acc_id_s:
-                    dict_create.update({'property_account_income_id': acc_id_s.id})
+                    dict_create.update(
+                        {'property_account_income_id': acc_id_s.id})
                 else:
                     self.import_accounts()
                     acc_id_s1 = self.env['account.account'].search(
                         [('code', '=', item.get('SalesDetails').get('AccountCode')), ('company_id', '=', self.id)])
                     if acc_id_s1:
-                        dict_create.update({'property_account_income_id': acc_id_s1.id})
+                        dict_create.update(
+                            {'property_account_income_id': acc_id_s1.id})
 
         if item.get('PurchaseDetails', False):
             if item.get('PurchaseDetails').get('UnitPrice', False):
@@ -779,7 +1059,8 @@ class ResCompany(models.Model):
             if item.get('PurchaseDetails').get('TaxType', False):
                 product_tax_p = self.env['account.tax'].search(
                     [('xero_tax_type_id', '=', item.get('PurchaseDetails').get('TaxType')),
-                     ('type_tax_use', '=', 'purchase'), ('price_include', '=', False), ('company_id', '=', self.id)], limit=1)
+                     ('type_tax_use', '=', 'purchase'), ('price_include', '=', False), ('company_id', '=', self.id)],
+                    limit=1)
 
                 if product_tax_p:
                     dict_create.update(
@@ -788,7 +1069,8 @@ class ResCompany(models.Model):
                     self.import_tax()
                     product_tax = self.env['account.tax'].search(
                         [('xero_tax_type_id', '=', item.get('PurchaseDetails').get('TaxType')),
-                         ('type_tax_use', '=', 'purchase'), ('price_include', '=', False),
+                         ('type_tax_use', '=',
+                          'purchase'), ('price_include', '=', False),
                          ('company_id', '=', self.id)])
                     if product_tax:
                         dict_create.update(
@@ -800,27 +1082,31 @@ class ResCompany(models.Model):
                         [('code', '=', item.get('PurchaseDetails').get('COGSAccountCode')),
                          ('company_id', '=', self.id)])
                     if acc_id_p:
-                        dict_create.update({'property_account_expense_id': acc_id_p.id})
+                        dict_create.update(
+                            {'property_account_expense_id': acc_id_p.id})
                     else:
                         self.import_accounts()
                         acc_id_p1 = self.env['account.account'].search(
                             [('code', '=', item.get('PurchaseDetails').get('COGSAccountCode')),
                              ('company_id', '=', self.id)])
                         if acc_id_p1:
-                            dict_create.update({'property_account_expense_id': acc_id_p1.id})
+                            dict_create.update(
+                                {'property_account_expense_id': acc_id_p1.id})
             else:
                 if item.get('PurchaseDetails').get('AccountCode', False):
                     acc_id_p = self.env['account.account'].search(
                         [('code', '=', item.get('PurchaseDetails').get('AccountCode')), ('company_id', '=', self.id)])
                     if acc_id_p:
-                        dict_create.update({'property_account_expense_id': acc_id_p.id})
+                        dict_create.update(
+                            {'property_account_expense_id': acc_id_p.id})
                     else:
                         self.import_accounts()
                         acc_id_p1 = self.env['account.account'].search(
                             [('code', '=', item.get('PurchaseDetails').get('AccountCode')),
                              ('company_id', '=', self.id)])
                         if acc_id_p1:
-                            dict_create.update({'property_account_expense_id': acc_id_p1.id})
+                            dict_create.update(
+                                {'property_account_expense_id': acc_id_p1.id})
 
         if item.get(item.get('IsPurchased')):
             dict_create.update({'sale_ok': True})
@@ -830,7 +1116,8 @@ class ResCompany(models.Model):
         if item.get('Description'):
             dict_create.update({'description_sale': item.get('Description')})
         if item.get('PurchaseDescription'):
-            dict_create.update({'description_purchase': item.get('PurchaseDescription')})
+            dict_create.update(
+                {'description_purchase': item.get('PurchaseDescription')})
 
         if item.get('IsTrackedAsInventory'):
             if item.get('IsTrackedAsInventory') == True:
@@ -839,12 +1126,14 @@ class ResCompany(models.Model):
         if dict_create and not product_exists:
             dict_create.update({'company_id': self.id})
             product_id = self.env['product.product'].create(dict_create)
-            _logger.info("Product Created Sucessfully..!! PRODUCT CODE = %s ", item.get('Code'))
+            _logger.info(
+                "Product Created Sucessfully..!! PRODUCT CODE = %s ", item.get('Code'))
 
         else:
 
             product_exists.write(dict_create)
-            _logger.info("\nProduct Updated Sucessfully..!! PRODUCT CODE = %s ", item.get('Code'))
+            _logger.info(
+                "\nProduct Updated Sucessfully..!! PRODUCT CODE = %s ", item.get('Code'))
 
     def import_contact_groups(self):
         """IMPORT CONTACT GROUPS FROM XERO TO ODOO"""
@@ -862,7 +1151,8 @@ class ResCompany(models.Model):
                 else:
                     for grp in parsed_dict.get('ContactGroups'):
                         self.create_imported_contact_groups(grp)
-                success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                success_form = self.env.ref(
+                    'pragmatic_odoo_xero_connector.import_successfull_view', False)
                 return {
                     'name': _('Notification'),
                     'type': 'ir.actions.act_window',
@@ -874,10 +1164,12 @@ class ResCompany(models.Model):
                     'target': 'new',
                 }
             else:
-                raise ValidationError('There is no any contact group present in XERO.')
+                raise ValidationError(
+                    'There is no any contact group present in XERO.')
 
         elif data.status_code == 401:
-            raise ValidationError('Time Out..!!\n Please check your connection or error in application.')
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
 
     @api.model
     def create_imported_contact_groups(self, grp):
@@ -912,15 +1204,33 @@ class ResCompany(models.Model):
             "\n\n\n<-----------------------------------MANUAL JOURNAL-------------------------------------->", )
 
         if not self.manual_journal:
-            raise UserError("Manual journal is not defined in the configuration.")
+            raise UserError(
+                "Manual journal is not defined in the configuration.")
 
-        for i in range(10000):
+        starting_page = 0
+        if self.xero_last_imported_so_page:
+            starting_page = self.xero_last_imported_so_page
+
+        if starting_page:
+            starting_page = starting_page - 1
+        _logger.info('starting_page: {} '.format(starting_page))
+        i = 0
+        count = 0
+
+        for i in range(starting_page, 10000):
+            if count == 10:
+                break
+            count += 1
+
             res = self.journal_main_function(i + 1)
             _logger.info("RESPONSE : %s", res)
             if not res:
                 break
+
+        self.xero_last_imported_so_page = i
         self.x_journal_date = datetime.datetime.today().strftime('%Y-%m-%d')
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -934,18 +1244,22 @@ class ResCompany(models.Model):
 
     def journal_main_function(self, page_no):
         if self.x_journal_date:
-            date_from = datetime.datetime.strptime(str(self.x_journal_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_journal_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
         if date_from:
             url = 'https://api.xero.com/api.xro/2.0/ManualJournals?page=%s&where=Date>=DateTime(%s,%s,%s)' % (page_no,
-                date_from.year, date_from.month, date_from.day)
+                                                                                                              date_from.year,
+                                                                                                              date_from.month,
+                                                                                                              date_from.day)
         else:
-            url = 'https://api.xero.com/api.xro/2.0/ManualJournals?page={}'.format(page_no)
+            url = 'https://api.xero.com/api.xro/2.0/ManualJournals?page={}'.format(
+                page_no)
         _logger.info('Page Data url : {} \n'.format(url))
         data = self.get_data(url)
-        _logger.info('Page {} Data : {}\n'.format(page_no,data))
+        _logger.info('Page {} Data : {}\n'.format(page_no, data))
         if data.status_code == 429:
             raise ValidationError('Too Many attempts...!')
         if data.status_code == 200:
@@ -953,12 +1267,14 @@ class ResCompany(models.Model):
             _logger.info('\n\nData From server : \n\n{}\n'.format(parsed_dict))
 
             manualjournals = parsed_dict.get('ManualJournals')
-            _logger.info('\n\nTotal No of manual journal in Page {} are : {}'.format(page_no,len(manualjournals)))
+            _logger.info('\n\nTotal No of manual journal in Page {} are : {}'.format(
+                page_no, len(manualjournals)))
 
             if manualjournals:
                 for Manual_Journal in manualjournals:
                     # if Manual_Journal.get('ManualJournals'):
-                    _logger.info(_('Header : \n\n\n\nManual Journal From Xero : %s\n\n\n\n' % Manual_Journal))
+                    _logger.info(
+                        _('Header : \n\n\n\nManual Journal From Xero : %s\n\n\n\n' % Manual_Journal))
                     self.create_journal_entry(Manual_Journal)
                     # else:
                     #     get_data = self.get_data(
@@ -987,14 +1303,16 @@ class ResCompany(models.Model):
 
         journal_entry = {}
         if rec.get('ManualJournals'):
-            _logger.info("PROCESSING Manual Journal NUMBER : %s", rec.get('Narration'))
-        _logger.info("PROCESSING Manual Journal ID : %s", rec.get('ManualJournalID'))
+            _logger.info(
+                "PROCESSING Manual Journal NUMBER : %s", rec.get('Narration'))
+        _logger.info(
+            "PROCESSING Manual Journal ID : %s", rec.get('ManualJournalID'))
 
         journal_id = self.manual_journal
         journal_entry['journal_id'] = journal_id.id
 
         journal_object = self.env['account.move'].search([('xero_invoice_id', '=', rec.get('ManualJournalID')),
-                                                              ('company_id', '=', self.id)])
+                                                          ('company_id', '=', self.id)])
         if not journal_object:
             journal_entry['move_type'] = 'entry'  # For Journal
 
@@ -1007,7 +1325,8 @@ class ResCompany(models.Model):
             if rec.get('Date'):
                 journal_date = self.compute_payment_date(rec.get('Date'))
                 journal_date_a = journal_date.split('T')
-                converted_date = datetime.datetime.strptime(journal_date_a[0], '%Y-%m-%d')
+                converted_date = datetime.datetime.strptime(
+                    journal_date_a[0], '%Y-%m-%d')
                 journal_entry['date'] = converted_date
 
             journal_entry['line_ids'] = []
@@ -1026,52 +1345,65 @@ class ResCompany(models.Model):
                 # _logger.info(_('Lines: \n\n\n\nLines of Manual Journals From Xero ______________________________________________: %s\n\n\n\n' %line_rec))
 
                 if isinstance(line_rec, (dict,)):
-                    line_ids = self.create_journal_line_entries(line_rec, lineAmountType=rec.get('LineAmountTypes'))
+                    line_ids = self.create_journal_line_entries(
+                        line_rec, lineAmountType=rec.get('LineAmountTypes'))
                     if line_ids:
                         journal_entry['line_ids'].append((0, 0, line_ids))
 
                     if line_rec.get('TaxType') != "NONE":
-                        tax_line_ids = self.create_journal_tax_lines(line_rec,lineAmountType=rec.get('LineAmountTypes'))
+                        tax_line_ids = self.create_journal_tax_lines(
+                            line_rec, lineAmountType=rec.get('LineAmountTypes'))
                         if line_rec.get('Tracking'):
                             for tracking_line in line_rec.get('Tracking'):
-                                account_id = self.create_categ_in_odoo(tracking_line, group_flag=0)
+                                account_id = self.create_categ_in_odoo(
+                                    tracking_line, group_flag=0)
                             if account_id:
-                                tax_line_ids['analytic_account_id']= account_id.id
+                                tax_line_ids[
+                                    'analytic_account_id'] = account_id.id
 
                         if tax_line_ids:
-                            journal_entry['line_ids'].append((0, 0, tax_line_ids))
+                            journal_entry['line_ids'].append(
+                                (0, 0, tax_line_ids))
 
                 else:
                     for line in line_rec:
                         # print('\n\n\n1111111111  ', line, '\n\n\n')
-                        line_ids = self.create_journal_line_entries(line, lineAmountType=rec.get('LineAmountTypes'))
+                        line_ids = self.create_journal_line_entries(
+                            line, lineAmountType=rec.get('LineAmountTypes'))
                         if line_ids:
                             journal_entry['line_ids'].append((0, 0, line_ids))
 
                         if line.get('TaxType') != "NONE":
                             # print('\n\n\n 222222222222  ',line,'\n\n\n')
                             tax_line_ids = {}
-                            tax_line_ids = self.create_journal_tax_lines(line, lineAmountType=rec.get('LineAmountTypes'))
+                            tax_line_ids = self.create_journal_tax_lines(
+                                line, lineAmountType=rec.get('LineAmountTypes'))
                             if tax_line_ids:
                                 if line.get('Tracking'):
                                     for tracking_line in line.get('Tracking'):
-                                        accnt = self.create_categ_in_odoo(tracking_line, group_flag=0)
+                                        accnt = self.create_categ_in_odoo(
+                                            tracking_line, group_flag=0)
                                     # print('\n\n\n 222222222222  ', line, tax_line_ids, '\n\n\n', accnt)
                                     if accnt:
-                                        tax_line_ids['analytic_account_id'] = accnt.id
+                                        tax_line_ids[
+                                            'analytic_account_id'] = accnt.id
 
                             if tax_line_ids:
-                                journal_entry['line_ids'].append((0, 0, tax_line_ids))
+                                journal_entry['line_ids'].append(
+                                    (0, 0, tax_line_ids))
 
             if rec.get('Status') == 'POSTED':
                 # if not journal_object:
                 # print('\n\nDictionary :', journal_entry, '\n\n\n\n\n\n', )
-                account_journal_id = self.env['account.move'].create(journal_entry)
+                account_journal_id = self.env[
+                    'account.move'].create(journal_entry)
                 account_journal_id.action_post()
                 self._cr.commit()
-                _logger.info('%s Journal imported Successfully...' % rec.get('Narration'))
+                _logger.info('%s Journal imported Successfully...' %
+                             rec.get('Narration'))
         else:
-            _logger.info('%s Journal Already imported...'% rec.get('Narration'))
+            _logger.info('%s Journal Already imported...' %
+                         rec.get('Narration'))
 
     def create_journal_tax_lines(self, line_rec, lineAmountType=None):
 
@@ -1080,14 +1412,15 @@ class ResCompany(models.Model):
              ('company_id', '=', self.id)])
         acc_ids = acc_tax.mapped('children_tax_ids')
 
-
         for tax in acc_ids:
             if tax.amount:
                 if lineAmountType == 'Inclusive':
-                    lineAmount = abs(line_rec.get('LineAmount')) - abs(line_rec.get('TaxAmount'))
+                    lineAmount = abs(
+                        line_rec.get('LineAmount')) - abs(line_rec.get('TaxAmount'))
                     tax_amount = lineAmount * (tax.amount / 100)
                 else:
-                    tax_amount = line_rec.get('LineAmount') * (tax.amount / 100)
+                    tax_amount = line_rec.get(
+                        'LineAmount') * (tax.amount / 100)
 
                 tax_line_ids = {}
                 tax_diff = abs(tax_amount) - abs(line_rec.get('TaxAmount'))
@@ -1102,9 +1435,9 @@ class ResCompany(models.Model):
                                                                                 account_id=t.account_id,
                                                                                 is_tax=1)
                             else:
-                                tax_line_ids = self.create_journal_line_entries(line_rec, is_tax=1)
+                                tax_line_ids = self.create_journal_line_entries(
+                                    line_rec, is_tax=1)
                 if tax_line_ids:
-                    # print('\n\n\n\n Tax Line: ',tax_line_ids,' \n\n\n________________________________________________________________\n')
                     return tax_line_ids
 
     def create_journal_line_entries(self, line, lineAmountType=None, account_id=None, is_tax=0):
@@ -1113,11 +1446,13 @@ class ResCompany(models.Model):
         account_obj = self.env['account.account']
 
         if line.get('Tracking'):
+            analytic_id = []
             for tracking_line in line.get('Tracking'):
-                analytic_account = self.create_categ_in_odoo(tracking_line, group_flag=0)
+                analytic_account = self.create_categ_in_odoo(
+                    tracking_line, group_flag=0)
+                analytic_id.extend(analytic_account.ids)
             if analytic_account:
-                line_ids['analytic_account_id'] = analytic_account.id
-
+                line_ids['analytic_tag_ids'] = analytic_id
 
         if line.get('Description'):
             line_ids['name'] = line.get('Description')
@@ -1127,9 +1462,11 @@ class ResCompany(models.Model):
         if is_tax == 0:
             if lineAmountType == "Inclusive":
                 if line.get('LineAmount') > 0:
-                    line_ids['debit'] = abs(line.get('LineAmount')) - abs(line.get('TaxAmount'))
+                    line_ids['debit'] = abs(
+                        line.get('LineAmount')) - abs(line.get('TaxAmount'))
                 else:
-                    line_ids['credit'] = abs(line.get('LineAmount')) - abs(line.get('TaxAmount'))
+                    line_ids['credit'] = abs(
+                        line.get('LineAmount')) - abs(line.get('TaxAmount'))
             else:
                 if line.get('LineAmount') > 0:
                     line_ids['debit'] = abs(line.get('LineAmount'))
@@ -1142,37 +1479,53 @@ class ResCompany(models.Model):
                 line_ids['credit'] = abs(line.get('TaxAmount'))
 
         if account_id is None:
-            account_id = account_obj.search([('xero_account_id', '=', line.get('AccountID'))])
+            account_id = account_obj.search(
+                [('xero_account_id', '=', line.get('AccountID'))])
 
         if not account_id:
-            account_id = account_obj.search([('code', '=', line.get('AccountCode'))])
-
-        # print("\n\n\n\n\n\n\n\n\n", account_id.code, line.get('AccountCode'), "\n\n\n\n\n\n\n\n\n")
+            account_id = account_obj.search(
+                [('code', '=', line.get('AccountCode'))])
 
         if not account_id:
-            url = 'https://api.xero.com/api.xro/2.0/Accounts/{}'.format(line.get('AccountID'))
+            url = 'https://api.xero.com/api.xro/2.0/Accounts/{}'.format(
+                line.get('AccountID'))
             data = self.get_data(url)
             if data:
                 self.create_account_in_odoo(data)
-            account_id = account_obj.search([('xero_account_id', '=', line.get('AccountID'))])
+            account_id = account_obj.search(
+                [('xero_account_id', '=', line.get('AccountID'))])
 
         if account_id:
             line_ids['account_id'] = account_id.id
-
-        # print('\n\n\n\n\n\nLine Amount:', lineAmountType, line.get('TaxAmount'), line.get('LineAmount'), '\nline_ids:',line_ids )
 
         return line_ids
 
     def import_invoice(self):
         """IMPORT INVOICE(Customer Invoice and Vendor Bills) FROM XERO TO ODOO"""
-        _logger.info("\n\n\n<-----------------------------------INVOICE-------------------------------------->", )
+        _logger.info(
+            "\n\n\n<-----------------------------------INVOICE-------------------------------------->", )
+        starting_page = 0
+        if self.xero_last_imported_invoice_page:
+            starting_page = self.xero_last_imported_invoice_page
 
-        for i in range(10000):
+        if starting_page:
+            starting_page = starting_page - 1
+
+        i = 0
+        count = 0
+        for i in range(starting_page, 10000000):
+            if count == 10:
+                break
+            count += 1
             res = self.invoice_main_function(i + 1)
             _logger.info("RESPONSE : %s", res)
             if not res:
                 break
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+        self.x_invoice_date = datetime.datetime.today().strftime('%Y-%m-%d')
+        self.xero_last_imported_invoice_page = i
+
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -1189,7 +1542,8 @@ class ResCompany(models.Model):
         _logger.info("INVOICE PAGE NO : %s", page_no)
 
         if self.x_invoice_date:
-            date_from = datetime.datetime.strptime(str(self.x_invoice_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_invoice_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
@@ -1197,12 +1551,12 @@ class ResCompany(models.Model):
             url = 'https://api.xero.com/api.xro/2.0/Invoices?page=' + str(
                 page_no) + '&where=Date>=DateTime(%s,%s,%s)' % (date_from.year, date_from.month, date_from.day)
         else:
-            url = 'https://api.xero.com/api.xro/2.0/Invoices?page=' + str(page_no)
+            url = 'https://api.xero.com/api.xro/2.0/Invoices?page=' + \
+                  str(page_no)
 
         data = self.get_data(url)
         if data:
             recs = []
-
             parsed_dict = json.loads(data.text)
             if parsed_dict.get('Invoices'):
                 record = parsed_dict.get('Invoices')
@@ -1218,9 +1572,11 @@ class ResCompany(models.Model):
                 return True
             else:
                 if page_no == 1:
-                    raise ValidationError('There is no any invoice present in XERO.')
+                    raise ValidationError(
+                        'There is no any invoice present in XERO.')
                 else:
-                    self.x_invoice_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_invoice_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
                     return False
 
         elif data.status_code == 401:
@@ -1230,7 +1586,8 @@ class ResCompany(models.Model):
     @api.model
     def create_imported_invoice(self, cust):
         if cust.get('InvoiceNumber'):
-            _logger.info("PROCESSING INVOICE NUMBER : %s", cust.get('InvoiceNumber'))
+            _logger.info(
+                "PROCESSING INVOICE NUMBER : %s", cust.get('InvoiceNumber'))
         _logger.info("PROCESSING INVOICE ID : %s", cust.get('InvoiceID'))
 
         account_invoice = self.env['account.move'].search(
@@ -1241,9 +1598,11 @@ class ResCompany(models.Model):
             if res_partner:
                 self.create_customer_for_invoice(cust, res_partner)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner2 = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
 
                 if res_partner2:
@@ -1271,20 +1630,46 @@ class ResCompany(models.Model):
 
         _logger.info('Currency Code : {}'.format(cust))
         if cust.get('CurrencyCode'):
-            currency = self.env['res.currency'].search([('name', '=', cust.get('CurrencyCode'))], limit=1)
-            if not currency:
-                currency = self.env['res.users'].search([('id', '=', self._uid)]).company_id.currency_id
-            dict_i['currency_id'] = currency.id if currency else ''
+            if self.currency_id.name != cust.get('CurrencyCode'):
+                currency_obj = self.env['res.currency'].search([('name', '=', cust.get('CurrencyCode'))], limit=1)
+
+                if currency_obj:
+                    dict_i['currency_id'] = currency_obj.id
+                    gte = cust.get('DateString')
+                    date1 = datetime.datetime.strptime(gte[0:10], '%Y-%m-%d')
+                    date_list = []
+                    for line in currency_obj.rate_ids:
+                        date_list.append(datetime.datetime.strptime(
+                            str(line.name), '%Y-%m-%d'))
+                    if date1 not in date_list:
+                        rate1 = self.env['res.currency.rate'].create({
+                            'name': date1,
+                            'company_rate': cust.get('CurrencyRate', False),
+                            'currency_id': currency_obj.id,
+                            'company_id': self.env.company.id,
+                        })
+
+                else:
+                    raise ValidationError(
+                        f"Please Activate the currency {cust.get('CurrencyCode')}.")
+            # currency = self.env['res.currency'].search(
+            #     [('name', '=', cust.get('CurrencyCode'))], limit=1)
+            # if not currency:
+            #     currency = self.env['res.users'].search(
+            #         [('id', '=', self._uid)]).company_id.currency_id
+            # dict_i['currency_id'] = currency.id if currency else ''
 
         _logger.info('Currency Code2 : {}'.format(dict_i))
 
         if cust.get('Type') == 'ACCREC':
-            sale = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
+            sale = self.env['account.journal'].search(
+                [('type', '=', 'sale')], limit=1)
             if sale:
                 dict_i['journal_id'] = sale.id
 
         if cust.get('Type') == 'ACCPAY':
-            purchase = self.env['account.journal'].search([('type', '=', 'purchase')], limit=1)
+            purchase = self.env['account.journal'].search(
+                [('type', '=', 'purchase')], limit=1)
             if purchase:
                 dict_i['journal_id'] = purchase.id
 
@@ -1327,43 +1712,75 @@ class ResCompany(models.Model):
                 i = cust.get('LineItems')
                 if not i.get('ItemCode'):
                     res_product = ''
-                    invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type, tax_state)
+                    invoice_line_vals = self.create_invoice_line(
+                        i, res_product, cust, invoice_type, tax_state)
                 else:
-                    res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                    res_product = self.env['product.product'].search(
+                        [('default_code', '=', i.get('ItemCode'))])
                     if res_product:
-                        invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type, tax_state)
+                        invoice_line_vals = self.create_invoice_line(
+                            i, res_product, cust, invoice_type, tax_state)
                     else:
                         self.fetch_the_required_product(i.get('ItemCode'))
-                        res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
-                            invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type, tax_state)
+                            invoice_line_vals = self.create_invoice_line(
+                                i, res_product, cust, invoice_type, tax_state)
                 if invoice_line_vals:
-                    dict_i['invoice_line_ids'].append((0, 0, invoice_line_vals))
+                    dict_i['invoice_line_ids'].append(
+                        (0, 0, invoice_line_vals))
             else:
                 for i in cust.get('LineItems'):
                     if not i.get('ItemCode'):
                         res_product = ''
 
-                        invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type, tax_state)
+                        invoice_line_vals = self.create_invoice_line(
+                            i, res_product, cust, invoice_type, tax_state)
                     else:
-                        res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
-                            invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type, tax_state)
+                            invoice_line_vals = self.create_invoice_line(
+                                i, res_product, cust, invoice_type, tax_state)
                         else:
                             self.fetch_the_required_product(i.get('ItemCode'))
-                            res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                            res_product = self.env['product.product'].search(
+                                [('default_code', '=', i.get('ItemCode'))])
                             if res_product:
                                 invoice_line_vals = self.create_invoice_line(i, res_product, cust, invoice_type,
                                                                              tax_state)
 
                     if invoice_line_vals:
-                        dict_i['invoice_line_ids'].append((0, 0, invoice_line_vals))
+                        dict_i['invoice_line_ids'].append(
+                            (0, 0, invoice_line_vals))
 
         _logger.info("Xero Invoice Data :----------------> %s ", cust)
 
         _logger.info("Invoice Dictionary :----------------> %s ", dict_i)
-
         invoice_obj = self.env['account.move'].create(dict_i)
+        if cust.get('InvoiceNumber'):
+            purchase_obj = self.env['purchase.order'].search(
+                ['|', ('name', '=', cust.get('InvoiceNumber')), ('partner_ref', '=', cust.get('InvoiceNumber')),
+                 ('xero_purchase_id', '!=', False)], limit=1)
+            if purchase_obj:
+                for picking in purchase_obj.picking_ids:
+                    wiz_act = picking.button_validate()
+                    wiz = Form(self.env[wiz_act['res_model']].with_context(wiz_act['context'])).save()
+                    wiz.process()
+                purchase_obj.write({
+                    'invoice_status': 'invoiced',
+                })
+                invoice_obj.write({
+                    'purchase_id': purchase_obj.id,
+                })
+                for invoice_line in invoice_obj.invoice_line_ids:
+                    for purchase_line in purchase_obj.order_line:
+                        if purchase_line.product_id.id == invoice_line.product_id.id:
+                            invoice_line.write({
+                                'purchase_line_id': purchase_line.id,
+                                'purchase_order_id': purchase_obj.id
+                            })
         self.env.cr.commit()
         if invoice_obj:
             if invoice_obj.state == 'draft':
@@ -1371,13 +1788,13 @@ class ResCompany(models.Model):
             _logger.info("Invoice Object created in odoo :  %s ", invoice_obj)
 
             if cust.get('InvoiceNumber'):
-                _logger.info("Invoice Created Successfully...!!! INV NO = %s ", cust.get('InvoiceNumber'))
+                _logger.info(
+                    "Invoice Created Successfully...!!! INV NO = %s ", cust.get('InvoiceNumber'))
 
     @api.model
     def create_invoice_line(self, i, res_product, cust, invoice_type, tax_state):
 
         dict_ol = {}
-
         if res_product == '':
             _logger.info("Product Not Defined.")
         else:
@@ -1388,6 +1805,23 @@ class ResCompany(models.Model):
 
         if i.get('DiscountRate'):
             dict_ol['discount'] = i.get('DiscountRate')
+
+        if i.get('Tracking'):
+            analytic_id = []
+            analytic_obj = self.env['account.analytic.tag']
+            for analytic in i.get('Tracking'):
+                analytic_ids = analytic_obj.search(
+                    [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                     ('company_id', '=', self.id)], limit=1)
+                if analytic_ids:
+                    analytic_id.extend(analytic_ids.ids)
+                else:
+                    self.import_tracking_categories(analytic['TrackingCategoryID'])
+                    analytic_ids = analytic_obj.search(
+                        [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                         ('company_id', '=', self.id)], limit=1)
+                    analytic_id.extend(analytic_ids.ids)
+            dict_ol['analytic_tag_ids'] = analytic_id
 
         acc_tax = ''
 
@@ -1410,7 +1844,7 @@ class ResCompany(models.Model):
 
                     acc_tax = self.env['account.tax'].search(
                         [('xero_tax_type_id', '=', i.get('TaxType')), ('type_tax_use', '=', 'sale'),
-                         ('price_include', '=', False), ('company_id', '=', self.id)])
+                         ('price_include', '=', False), ('company_id', '=', self.id)], limit=1)
                     if acc_tax:
                         dict_ol['tax_ids'] = [(6, 0, [acc_tax.id])]
                     else:
@@ -1503,14 +1937,16 @@ class ResCompany(models.Model):
                     dict_ol['account_id'] = acc_id_s.id
         elif not i.get('AccountCode') and not i.get('Quantity') and not i.get('UnitAmount'):
             if not self.default_account:
-                raise ValidationError('PLease Set the Default Account in Xero Configuration.')
+                raise ValidationError(
+                    'PLease Set the Default Account in Xero Configuration.')
             if self.default_account:
                 dict_ol['account_id'] = self.default_account.id
                 dict_ol['quantity'] = 1.0
                 dict_ol['price_unit'] = 0.0
         elif not i.get('AccountCode') and not i.get('ItemCode'):
             if not self.default_account:
-                raise ValidationError('PLease Set the Default Account in Xero Configuration.')
+                raise ValidationError(
+                    'PLease Set the Default Account in Xero Configuration.')
 
             if self.default_account:
                 dict_ol['account_id'] = self.default_account.id
@@ -1528,35 +1964,61 @@ class ResCompany(models.Model):
             if invoice_type == 'out_invoice':
                 if res_product:
                     if res_product.property_account_income_id:
-                        dict_ol['account_id'] = res_product.property_account_income_id.id
+                        dict_ol[
+                            'account_id'] = res_product.property_account_income_id.id
                         _logger.info("PRODUCT has income account set")
                     else:
-                        dict_ol['account_id'] = res_product.categ_id.property_account_income_categ_id.id
-                        _logger.info("No Income account was set, taking from product category..")
+                        dict_ol[
+                            'account_id'] = res_product.categ_id.property_account_income_categ_id.id
+                        _logger.info(
+                            "No Income account was set, taking from product category..")
             else:
                 if res_product:
                     if res_product.property_account_expense_id:
-                        dict_ol['account_id'] = res_product.property_account_expense_id.id
+                        dict_ol[
+                            'account_id'] = res_product.property_account_expense_id.id
                         _logger.info("PRODUCT has income account set")
                     else:
-                        dict_ol['account_id'] = res_product.categ_id.property_account_expense_categ_id.id
-                        _logger.info("No Income account was set, taking from product category..")
+                        dict_ol[
+                            'account_id'] = res_product.categ_id.property_account_expense_categ_id.id
+                        _logger.info(
+                            "No Income account was set, taking from product category..")
 
         return dict_ol
 
     def import_sale_order(self, qo_number=False):
         """IMPORT SALE ORDER FROM XERO TO ODOO"""
-        for i in range(10000):
+        starting_page = 0
+        if self.xero_last_imported_so_page:
+            starting_page = self.xero_last_imported_so_page
+
+        if starting_page:
+            starting_page = starting_page - 1
+        _logger.info('starting_page: {} '.format(starting_page))
+        i = 0
+        count = 0
+
+        for i in range(starting_page, 10000):
+            if count == 10:
+                break
+            count += 1
+
             if self:
                 res = self.so_main_function(i + 1, qo_number)
             else:
-                company = self.env['res.users'].search([('id', '=', self._uid)]).company_id
+                company = self.env['res.users'].search(
+                    [('id', '=', self._uid)]).company_id
                 res = company.so_main_function(i + 1, qo_number)
             _logger.info("RESPONSE : %s", res)
 
             if not res:
-                break;
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                break
+
+        self.x_salesorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
+        self.xero_last_imported_so_page = i
+
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -1572,16 +2034,20 @@ class ResCompany(models.Model):
     def so_main_function(self, page_no, qo_number):
         _logger.info("SALE PAGE NO : %s", page_no)
         if self.x_salesorder_date:
-            date_from = datetime.datetime.strptime(str(self.x_salesorder_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_salesorder_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
         if qo_number:
-            url = 'https://api.xero.com/api.xro/2.0/Quotes?QuoteNumber=%s' % (qo_number)
+            url = 'https://api.xero.com/api.xro/2.0/Quotes?QuoteNumber=%s' % (
+                qo_number)
         elif date_from:
-            url = 'https://api.xero.com/api.xro/2.0/Quotes?DateFrom=%s' % (date_from)
+            url = 'https://api.xero.com/api.xro/2.0/Quotes?DateFrom=%s' % (
+                date_from)
         else:
-            url = 'https://api.xero.com/api.xro/2.0/Quotes?page=' + str(page_no)
+            url = 'https://api.xero.com/api.xro/2.0/Quotes?page=' + \
+                  str(page_no)
 
         data = self.get_data(url)
         if data:
@@ -1596,7 +2062,8 @@ class ResCompany(models.Model):
                         self.create_imported_sale_order(record)
                     else:
                         if record.get('Quotes'):
-                            _logger.info("SALES ORDER DOES NOT CONTAIN ANY PRODUCT. PO = %s", record.get('Quotes'))
+                            _logger.info(
+                                "SALES ORDER DOES NOT CONTAIN ANY PRODUCT. PO = %s", record.get('Quotes'))
 
                 else:
                     for cust in parsed_dict.get('Quotes'):
@@ -1605,18 +2072,21 @@ class ResCompany(models.Model):
                             self.create_imported_sale_order(cust)
                         else:
                             if cust.get('Quotes'):
-                                _logger.info("SALES ORDER DOES NOT CONTAIN ANY PRODUCT. PO = %s", cust.get('Quotes'))
+                                _logger.info(
+                                    "SALES ORDER DOES NOT CONTAIN ANY PRODUCT. PO = %s", cust.get('Quotes'))
 
-                # print("record:::::::::::::::::::",record)
                 if self.x_salesorder_date:
-                    self.x_salesorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_salesorder_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
                     return False
                 return True
             else:
                 if page_no == 1:
-                    raise ValidationError('There is no any sale order present in XERO.')
+                    raise ValidationError(
+                        'There is no any sale order present in XERO.')
                 else:
-                    self.x_salesorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_salesorder_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
                     return False
 
         elif data.status_code == 401:
@@ -1635,9 +2105,11 @@ class ResCompany(models.Model):
             if res_partner:
                 self.create_customer_for_sale_order(cust, res_partner)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
 
                 if res_partner:
@@ -1646,14 +2118,18 @@ class ResCompany(models.Model):
             res_partner = self.env['res.partner'].search(
                 [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)], limit=1)
             if res_partner:
-                self.update_customer_for_sale_order(cust, res_partner, sale_order)
+                self.update_customer_for_sale_order(
+                    cust, res_partner, sale_order)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
                 if res_partner:
-                    self.update_customer_for_sale_order(cust, res_partner, sale_order)
+                    self.update_customer_for_sale_order(
+                        cust, res_partner, sale_order)
 
     @api.model
     def create_customer_for_sale_order(self, cust, res_partner):
@@ -1704,9 +2180,11 @@ class ResCompany(models.Model):
 
         so_obj = self.env['sale.order'].create(dict_s)
         if so_obj:
-            _logger.info("Sale Order Created successfully  SO = %s ", cust.get('QuoteNumber'))
+            _logger.info(
+                "Sale Order Created successfully  SO = %s ", cust.get('QuoteNumber'))
         else:
-            _logger.info("Sale Order Not Created successfully  SO = %s ", cust.get('QuoteNumber'))
+            _logger.info(
+                "Sale Order Not Created successfully  SO = %s ", cust.get('QuoteNumber'))
 
         if cust.get('LineItems'):
             order_lines = cust.get('LineItems')
@@ -1737,9 +2215,11 @@ class ResCompany(models.Model):
                             res_product = self.env['product.product'].search(
                                 [('default_code', '=', i.get('ItemCode'))])
                             if res_product:
-                                self.create_sale_order_line(i, so_obj, res_product)
+                                self.create_sale_order_line(
+                                    i, so_obj, res_product)
                         else:
-                            _logger.info('[SO ORDER LINE] Item Code Not defined.')
+                            _logger.info(
+                                '[SO ORDER LINE] Item Code Not defined.')
 
     @api.model
     def update_customer_for_sale_order(self, cust, res_partner, sale_order):
@@ -1790,9 +2270,11 @@ class ResCompany(models.Model):
 
         s_o = sale_order.write(dict_s)
         if s_o:
-            _logger.info("Sale Order Updated successfully  SO = %s ", cust.get('QuoteNumber'))
+            _logger.info(
+                "Sale Order Updated successfully  SO = %s ", cust.get('QuoteNumber'))
         else:
-            _logger.info("Sale Order Not Updated successfully  PO = %s ", cust.get('QuoteNumber'))
+            _logger.info(
+                "Sale Order Not Updated successfully  PO = %s ", cust.get('QuoteNumber'))
 
         if cust.get('LineItems'):
             order_lines = cust.get('LineItems')
@@ -1801,14 +2283,16 @@ class ResCompany(models.Model):
                 res_product = self.env['product.product'].search(
                     [('default_code', '=', i.get('ItemCode'))])
                 if res_product:
-                    self.update_sale_order_line(i, sale_order, res_product, cust)
+                    self.update_sale_order_line(
+                        i, sale_order, res_product, cust)
                 else:
                     if i.get('ItemCode'):
                         self.fetch_the_required_product(i.get('ItemCode'))
                         res_product = self.env['product.product'].search(
                             [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
-                            self.update_sale_order_line(i, sale_order, res_product, cust)
+                            self.update_sale_order_line(
+                                i, sale_order, res_product, cust)
                     else:
                         _logger.info('[SO ORDER LINE] Item Code Not defined.')
 
@@ -1818,7 +2302,8 @@ class ResCompany(models.Model):
                         [('default_code', '=', i.get('ItemCode'))])
 
                     if res_product:
-                        self.update_sale_order_line(i, sale_order, res_product, cust)
+                        self.update_sale_order_line(
+                            i, sale_order, res_product, cust)
                     else:
                         if i.get('ItemCode'):
                             self.fetch_the_required_product(i.get('ItemCode'))
@@ -1826,9 +2311,11 @@ class ResCompany(models.Model):
                                 [('default_code', '=', i.get('ItemCode'))])
 
                             if res_product:
-                                self.update_sale_order_line(i, sale_order, res_product, cust)
+                                self.update_sale_order_line(
+                                    i, sale_order, res_product, cust)
                         else:
-                            _logger.info('[SO ORDER LINE] Item Code Not defined.')
+                            _logger.info(
+                                '[SO ORDER LINE] Item Code Not defined.')
 
     @api.model
     def create_sale_order_line(self, i, so_obj, res_product):
@@ -1893,6 +2380,23 @@ class ResCompany(models.Model):
             dict_l['price_unit'] = float(i.get('UnitAmount'))
         else:
             dict_l['price_unit'] = 0.0
+
+        if i.get('Tracking'):
+            analytic_id = []
+            analytic_obj = self.env['account.analytic.tag']
+            for analytic in i.get('Tracking'):
+                analytic_ids = analytic_obj.search(
+                    [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                     ('company_id', '=', self.id)], limit=1)
+                if analytic_ids:
+                    analytic_id.extend(analytic_ids.ids)
+                else:
+                    self.import_tracking_categories(analytic['TrackingCategoryID'])
+                    analytic_ids = analytic_obj.search(
+                        [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                         ('company_id', '=', self.id)], limit=1)
+                    analytic_id.extend(analytic_ids.ids)
+            dict_l['analytic_tag_ids'] = analytic_id
 
         if i.get('Description'):
             dict_l['name'] = i.get('Description')
@@ -2057,9 +2561,8 @@ class ResCompany(models.Model):
                              ('price_include', '=', False), ('company_id', '=', self.id)])
                         if product_tax_s1:
                             dict_l['tax_id'] = [(6, 0, [product_tax_s1.id])]
-
             if i.get('LineItemID'):
-                dict_l['xero_purchase_line_id'] = i.get('LineItemID')
+                dict_l['xero_sale_line_id'] = i.get('LineItemID')
                 # dict_l['date_planned'] = sale_order.date_order
 
             dict_l['product_uom'] = 1
@@ -2076,22 +2579,545 @@ class ResCompany(models.Model):
 
             # if cust.get('DeliveryDate'):
             #     dict_l['date_planned'] = date_planned
-
             create_p = self.env['sale.order.line'].create(dict_l)
             if create_p:
                 _logger.info(_("Sale line Created Successfully"))
             else:
                 _logger.info(_("Sale line not Created Successfully"))
 
-    def import_purchase_order(self):
-        """IMPORT PURCHASE ORDER FROM XERO TO ODOO"""
-        for i in range(10000):
-            res = self.po_main_function(i + 1)
+    def import_spnd_mny(self):
+        """IMPORT Spend Money FROM XERO TO ODOO"""
+        if not self:
+            self = self.env['res.users'].search(
+                [('id', '=', self._uid)]).company_id
+        type = "SPEND"
+        starting_page = 1
+        if self.xero_last_imported_spnd_mny_page:
+            starting_page = self.xero_last_imported_spnd_mny_page
+
+        if starting_page:
+            i = starting_page
+        _logger.info('starting_page: {} '.format(starting_page))
+        i = starting_page
+        count = 0
+
+        for i in range(starting_page, 10000):
+            if count == 3:
+                break
+            count += 1
+            self.xero_last_imported_spnd_mny_page = i
+
+            if self:
+                res = self.spnd_rcv_main_function(i, type)
+            else:
+                company = self.env['res.users'].search(
+                    [('id', '=', self._uid)]).company_id
+                res = company.spnd_rcv_main_function(i, type)
             _logger.info("RESPONSE : %s", res)
 
             if not res:
-                break;
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                break
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
+        return {
+            'name': _('Notification'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'form',
+            'res_model': 'res.company.message',
+            'views': [(success_form.id, 'form')],
+            'view_id': success_form.id,
+            'target': 'new',
+        }
+
+    @api.model
+    def import_rcv_mny(self, a):
+        """IMPORT Spend Money FROM XERO TO ODOO"""
+        if not self:
+            self = self.env['res.users'].search(
+                [('id', '=', self._uid)]).company_id
+        type = "RECEIVE"
+        starting_page = 1
+        if self.xero_last_imported_rcv_mny_page:
+            starting_page = self.xero_last_imported_rcv_mny_page
+
+        _logger.info('starting_page: {} '.format(starting_page))
+        i = starting_page
+        count = 0
+
+        for i in range(starting_page, 10000):
+            if count == 2:
+                break
+            count += 1
+            self.xero_last_imported_rcv_mny_page = i
+
+            if self:
+                res = self.spnd_rcv_main_function(i, type)
+            else:
+                company = self.env['res.users'].search(
+                    [('id', '=', self._uid)]).company_id
+                res = company.spnd_rcv_main_function(i, type)
+            _logger.info("RESPONSE : %s", res)
+
+            if not res:
+                break
+
+        self.receive_money_date = datetime.datetime.today().strftime('%Y-%m-%d')
+
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
+        return {
+            'name': _('Notification'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'form',
+            'res_model': 'res.company.message',
+            'views': [(success_form.id, 'form')],
+            'view_id': success_form.id,
+            'target': 'new',
+        }
+
+    def view_spnd_rcv_main_function_failed(self):
+        faild_transactions = self.env['xero.logger'].search([
+            ('odoo_object', '=', 'SPEND/RECEIVE'),
+            ('status', '=', 'done')])
+        faild_transactions.unlink()
+        faild_transactions = self.env['xero.logger'].search([
+            ('odoo_object', '=', 'SPEND/RECEIVE'),
+            ('status', '=', 'failed')])
+        return {
+            'name': _('Xero Logger'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'tree,form',
+            'res_model': 'xero.logger',
+            'domain': [('id', 'in', faild_transactions.ids)]
+        }
+
+    def spnd_rcv_main_function_failed(self):
+        try:
+            faild_transactions = self.env['xero.logger'].search([
+                ('odoo_object', '=', 'SPEND/RECEIVE'),
+                ('status', '=', 'done')])
+            faild_transactions.unlink()
+            faild_transactions = self.env['xero.logger'].search([
+                ('odoo_object', '=', 'SPEND/RECEIVE'),
+                ('status', '=', 'failed')])
+            for transaction in faild_transactions:
+                url = f'https://api.xero.com/api.xro/2.0/banktransactions/{transaction.xero_ref}'
+                data = self.get_data(url)
+                if data.status_code == 200:
+                    parsed_dict = json.loads(data.text)
+                    record = parsed_dict
+                    if parsed_dict.get('BankTransactions') and not parsed_dict.get('BankTransactions')[0].get(
+                            'Status') == 'DELETED':
+                        self.create_spnd_rcv_bank_transaction(parsed_dict,
+                                                              parsed_dict.get('BankTransactions')[0].get('Type'))
+                    transaction.status = 'done'
+                    self._cr.commit()
+                else:
+                    _logger.info("Status Code : %s", data.status_code)
+            else:
+                raise ValidationError(
+                    'There is no any Bank Transaction present in XERO.')
+        except Exception as e:
+            raise ValidationError(_('Error : %s' % e))
+
+    def spnd_rcv_main_function_all(self):
+        threaded_calculation = threading.Thread(target=self.spnd_rcv_main_function_all_thread, args=())
+        threaded_calculation.start()
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def spnd_rcv_main_function_all_thread(self):
+        with self.pool.cursor() as new_cr:
+            self = self.with_env(self.env(cr=new_cr))
+            try:
+                url = 'https://api.xero.com/api.xro/2.0/BankTransactions'
+                print("===url=======", url)
+                data = self.get_data(url)
+                xero_logger = self.env['xero.logger']
+                print("====data===", data, data.status_code, data.text)
+                if data.status_code == 200:
+                    if data:
+                        parsed_dict = json.loads(data.text)
+                        bank_trans = []
+                        for cust in parsed_dict.get('BankTransactions'):
+                            bank_trans.append(cust.get('BankTransactionID'))
+                        print("=========", bank_trans)
+                        a = len(bank_trans)
+                        count = 1
+                        try:
+                            for transaction in bank_trans:
+                                url = f'https://api.xero.com/api.xro/2.0/banktransactions/{transaction}'
+                                data = self.get_data(url)
+                                _logger.info("\n=+++++++===Transaction=== %s  %s/%s  %s", transaction, count, a,
+                                             data.status_code)
+
+                                if data.status_code == 200:
+                                    parsed_dict = json.loads(data.text)
+                                    # _logger.info("Bank Transaction OBJECT : %s", parsed_dict)
+                                    record = parsed_dict
+                                    if parsed_dict.get('BankTransactions') and not parsed_dict.get('BankTransactions')[
+                                                                                       0].get('Status') == 'DELETED':
+                                        self.create_spnd_rcv_bank_transaction(parsed_dict,
+                                                                              parsed_dict.get('BankTransactions')[
+                                                                                  0].get('Type'))
+                                elif data.status_code == 401:
+                                    _logger.info("Bank Transaction OBJECT 401 : %s", parsed_dict)
+                                    xero_logger.create({
+                                        'odoo_name': 'account.move',
+                                        'odoo_object': 'SPEND/RECEIVE',
+                                        'status_code': data.status_code,
+                                        'message': data.text,
+                                        'xero_ref': transaction,
+                                        'status': 'failed'
+                                    })
+                                    self._cr.commit()
+                                    raise ValidationError(
+                                        'Time Out..!!\n Please check your connection or error in application or refresh token.')
+                                else:
+                                    xero_logger.create({
+                                        'odoo_name': 'account.move',
+                                        'odoo_object': 'SPEND/RECEIVE',
+                                        'status_code': data.status_code,
+                                        'message': data.text,
+                                        'xero_ref': transaction,
+                                        'status': 'failed'
+                                    })
+                                    # print('\n\n\n____________________________________', message.get('Detail'))
+                                    self._cr.commit()
+                                    _logger.info("Bank Transaction OBJECT : %s", parsed_dict)
+                                count += 1
+                            else:
+                                raise ValidationError(
+                                    'There is no any Bank Transaction present in XERO.')
+                        except Exception as e:
+                            _logger.info('Data', e)
+                        return True
+                    elif data.status_code == 401:
+                        raise ValidationError(
+                            'Time Out..!!\n Please check your connection or error in application or refresh token.')
+                elif data.status_code == 401:
+                    raise ValidationError(
+                        'Time Out..!!\n Please check your connection or error in application.')
+            except Exception:
+                _logger.info('Attempt to run procurement scheduler aborted, as already running')
+                self._cr.rollback()
+                # return {}
+
+    @api.model
+    def spnd_rcv_main_function(self, page_no, type):
+        _logger.info(f"{type} PAGE NO : {page_no}")
+
+        # _logger.info(f"Spend PAGE NO : %s", page_no)
+        url = 'https://api.xero.com/api.xro/2.0/BankTransactions?page=' + \
+              str(page_no)
+        data = self.get_data(url)
+        if data.status_code == 200:
+            if data:
+                parsed_dict = json.loads(data.text)
+                xero_logger = self.env['xero.logger']
+                if parsed_dict.get('BankTransactions'):
+                    bank_trans = []
+                    for cust in parsed_dict.get('BankTransactions'):
+                        bank_trans.append(cust.get('BankTransactionID'))
+                        # if type == "SPEND":
+                        #     if cust.get('Type') == 'SPEND':
+                        #         bank_trans.append(cust.get('BankTransactionID'))
+                        # else:
+                        #     if cust.get('Type') == 'RECEIVE':
+                        #         bank_trans.append(cust.get('BankTransactionID'))
+                    for transaction in bank_trans:
+                        url = f'https://api.xero.com/api.xro/2.0/banktransactions/{transaction}'
+                        data = self.get_data(url)
+                        if data.status_code == 200:
+                            parsed_dict = json.loads(data.text)
+                            _logger.info("Bank Transaction OBJECT : %s", parsed_dict)
+                            record = parsed_dict
+
+                            if parsed_dict.get('BankTransactions') and not parsed_dict.get('BankTransactions')[0].get(
+                                    'Status') == 'DELETED':
+                                self.create_spnd_rcv_bank_transaction(parsed_dict,
+                                                                      parsed_dict.get('BankTransactions')[0].get(
+                                                                          'Type'))
+
+                            # if not isinstance(record, (dict,)):
+                            #     if not parsed_dict.get('BankTransactions')[0].get('Status') == 'DELETED':
+                            #         self.create_spnd_rcv_bank_transaction(record, type)
+                            # else:
+                            #     if not parsed_dict.get('BankTransactions')[0].get('Status') == 'DELETED':
+                            #         self.create_spnd_rcv_bank_transaction(parsed_dict, type)
+
+                            elif data.status_code == 401:
+                                _logger.info("Bank Transaction OBJECT 401 : %s", parsed_dict)
+                                xero_logger.create({
+                                    'odoo_name': 'account.move',
+                                    'odoo_object': 'SPEND/RECEIVE',
+                                    'status_code': data.status_code,
+                                    'message': data.text,
+                                    'xero_ref': transaction,
+                                    'status': 'failed'
+                                })
+                                self._cr.commit()
+                                raise ValidationError(
+                                    'Time Out..!!\n Please check your connection or error in application or refresh token.')
+                            else:
+                                xero_logger.create({
+                                    'odoo_name': 'account.move',
+                                    'odoo_object': 'SPEND/RECEIVE',
+                                    'status_code': data.status_code,
+                                    'message': data.text,
+                                    'xero_ref': transaction,
+                                    'status': 'failed'
+                                })
+                                # print('\n\n\n____________________________________', message.get('Detail'))
+                                self._cr.commit()
+                                _logger.info("Bank Transaction OBJECT : %s", parsed_dict)
+                else:
+                    raise ValidationError(
+                        'There is no any Bank Transaction present in XERO.')
+                return True
+            elif data.status_code == 401:
+                raise ValidationError(
+                    'Time Out..!!\n Please check your connection or error in application or refresh token.')
+        elif data.status_code == 401:
+            raise ValidationError(
+                'Time Out..!!\n Please check your connection or error in application.')
+
+    @api.model
+    def create_spnd_rcv_bank_transaction(self, parsed_dict, type):
+        bank_transaction = parsed_dict.get('BankTransactions')[0]
+        account_invoice = self.env['account.move'].search(
+            [('xero_bank_transaction_id', '=', bank_transaction.get('BankTransactionID')),
+             ('company_id', '=', self.id)], limit=1)
+        if not account_invoice:
+            if bank_transaction.get('Contact', False):
+                res_partner = self.env['res.partner'].search(
+                    [('xero_cust_id', '=', bank_transaction.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)], limit=1)
+                if res_partner:
+                    self.create_transaction(parsed_dict, res_partner, type)
+                else:
+                    self.fetch_the_required_customer(
+                        bank_transaction.get('Contact').get('ContactID'))
+                    res_partner2 = self.env['res.partner'].search(
+                        [('xero_cust_id', '=', bank_transaction.get('Contact').get('ContactID')),
+                         ('company_id', '=', self.id)],
+                        limit=1)
+
+                    if res_partner2:
+                        self.create_transaction(parsed_dict, res_partner2, type)
+        else:
+            _logger.info("Bank Transaction OBJECT : %s", account_invoice)
+            _logger.info("Bank Transaction STATE : %s", account_invoice.state)
+
+            if account_invoice.state == 'posted':
+                _logger.info("You cannot update a posted Bank Transaction.")
+            if account_invoice.state == 'draft':
+                _logger.info(
+                    "Code is not available for updating Bank Transaction, please delete the particular Bank Transaction and import the Bank Transaction again.")
+            if account_invoice.state == 'cancel':
+                _logger.info("You cannot update a cancelled Bank Transaction.")
+
+    def create_transaction(self, parsed_dict, res_partner, type):
+        inv_obj = self.env['account.move']
+        data_account_type_liquidity = self.env.ref('account.data_account_type_liquidity').id
+        dict_obj = parsed_dict.get('BankTransactions')[0]
+        analytic_obj = self.env['account.analytic.tag']
+        account_obj = self.env['account.account']
+        list_line = []
+        if dict_obj.get('BankAccount', False):
+            if dict_obj.get('BankAccount').get('AccountID', False):
+                default_account_id = account_obj.search(
+                    ['|', '|', ('xero_account_id', '=', dict_obj.get('BankAccount').get('AccountID')),
+                     ('name', '=', dict_obj.get('BankAccount').get('Name', False)),
+                     ('code', '=', dict_obj.get('BankAccount').get('Code', False)),
+                     ('company_id', '=', self.id)], limit=1)
+
+                if not default_account_id:
+                    url = 'https://api.xero.com/api.xro/2.0/Accounts/{}'.format(
+                        dict_obj.get('BankAccount').get('AccountID'))
+                    data = self.get_data(url)
+                    if data:
+                        self.create_account_in_odoo(data)
+                    default_account_id = account_obj.search(
+                        [('xero_account_id', '=', dict_obj.get('BankAccount').get('AccountID'))])
+                jornal_id = self.env['account.journal'].search(
+                    [('default_account_id.user_type_id', '=', data_account_type_liquidity),
+                     ('default_account_id', '=', default_account_id.id),
+                     ('type', 'in', ['bank', 'cash']), ('company_id', '=', self.id)], limit=1)
+                if not jornal_id:
+                    raise ValidationError(
+                        _("Payment journal is not defined for XERO's Account : %s " % (
+                            dict_obj.get('BankAccount').get('Code'))))
+
+                currency_id = self.env['res.currency'].search(
+                    [('name', '=', dict_obj.get('CurrencyCode'))], limit=1)
+                if not currency_id:
+                    raise ValidationError(
+                        f"Currency Not Found: {dict_obj.get('CurrencyCode')}")
+                for line in dict_obj.get('LineItems'):
+                    account_id = account_obj.search(
+                        [('xero_account_id', '=', line.get('AccountID')),
+                         ('company_id', '=', self.id), ('code', '=', line.get('AccountCode'))], limit=1)
+                    if not account_id:
+                        url = 'https://api.xero.com/api.xro/2.0/Accounts/{}'.format(
+                            line.get('AccountID'))
+                        data = self.get_data(url)
+                        if data:
+                            self.create_account_in_odoo(data)
+                        account_id = account_obj.search(
+                            [('xero_account_id', '=', line.get('AccountID'))], limit=1)
+                    analytic_id = []
+                    if line.get('Tracking'):
+                        for analytic in line.get('Tracking'):
+                            analytic_ids = analytic_obj.search(
+                                [('name', '=', analytic.get('Option', False)), ('xero_tracking_opt_id', '!=', False),
+                                 ('company_id', '=', self.id)], limit=1)
+                            if analytic_ids:
+                                analytic_id.extend(analytic_ids.ids)
+                            else:
+                                self.import_tracking_categories(analytic.get('TrackingCategoryID'))
+                                analytic_ids = analytic_obj.search(
+                                    [('name', '=', analytic.get('Option', False)),
+                                     ('xero_tracking_opt_id', '!=', False),
+                                     ('company_id', '=', self.id)], limit=1)
+                                analytic_id.extend(analytic_ids.ids)
+                    if type == "SPEND":
+                        if line.get('LineAmount', False) < 0:
+                            list_line.append((0, 0, {
+                                'account_id': account_id.id,
+                                'name': line.get('Description', False),
+                                'currency_id': currency_id.id,
+                                'credit': abs(line.get('LineAmount', False)),
+                                'analytic_tag_ids': analytic_id,
+                                'partner_id': res_partner.id
+                            }))
+                        else:
+                            list_line.append((0, 0, {
+                                'account_id': account_id.id,
+                                'name': line.get('Description', False),
+                                'currency_id': currency_id.id,
+                                'debit': line.get('LineAmount', False),
+                                'analytic_tag_ids': analytic_id,
+                                'partner_id': res_partner.id
+                            }))
+                    else:
+                        if line.get('LineAmount') < 0:
+                            list_line.append((0, 0, {
+                                'account_id': account_id.id,
+                                'name': line.get('Description', False),
+                                'currency_id': currency_id.id,
+                                'debit': abs(line.get('LineAmount', False)),
+                                'analytic_tag_ids': analytic_id,
+                                'partner_id': res_partner.id
+                            }))
+                        else:
+                            list_line.append((0, 0, {
+                                'account_id': account_id.id,
+                                'name': line.get('Description', False),
+                                'currency_id': currency_id.id,
+                                'credit': line.get('LineAmount', False),
+                                'analytic_tag_ids': analytic_id,
+                                'partner_id': res_partner.id
+                            }))
+                if dict_obj.get('BankAccount', False):
+                    name = dict_obj.get('BankAccount').get('Name', False)
+                else:
+                    name = ''
+                if type == "SPEND":
+                    if dict_obj.get('SubTotal') < 0:
+                        list_line.append((0, 0, {
+                            'account_id': default_account_id.id,
+                            'name': name,
+                            'currency_id': currency_id.id,
+                            'debit': abs(dict_obj.get('SubTotal', False)),
+                        }))
+                    else:
+                        list_line.append((0, 0, {
+                            'account_id': default_account_id.id,
+                            'name': name,
+                            'currency_id': currency_id.id,
+                            'credit': dict_obj.get('SubTotal', False),
+                        }))
+                else:
+                    if dict_obj.get('SubTotal') < 0:
+                        list_line.append((0, 0, {
+                            'account_id': default_account_id.id,
+                            'name': name,
+                            'currency_id': currency_id.id,
+                            'credit': abs(dict_obj.get('SubTotal', False)),
+                        }))
+                    else:
+                        list_line.append((0, 0, {
+                            'account_id': default_account_id.id,
+                            'name': name,
+                            'currency_id': currency_id.id,
+                            'debit': dict_obj.get('SubTotal', False),
+                        }))
+                if dict_obj.get('LineAmountTypes') == 'Exclusive':
+                    tax_state = 'exclusive'
+                elif dict_obj.get('LineAmountTypes') == 'Inclusive':
+                    tax_state = 'inclusive'
+                else:
+                    tax_state = 'no_tax'
+                    dict_obj.get('Reference', False)
+                if dict_obj.get('Reference', False):
+                    ref = dict_obj.get('Reference')
+                else:
+                    if dict_obj.get('BankAccount', False):
+                        ref = dict_obj.get('BankAccount').get('Name', False)
+                    else:
+                        ref = ''
+                move_id = inv_obj.create(
+                    {
+                        'xero_bank_transaction_id': dict_obj.get('BankTransactionID'),
+                        'bank_transaction_type': dict_obj.get('Type', False),
+                        'tax_state': tax_state,
+                        'ref': ref,
+                        'journal_id': jornal_id.id,
+                        'partner_id': res_partner.id,
+                        'invoice_date': parser.isoparse(dict_obj.get('DateString', False)).date() if dict_obj.get(
+                            'DateString', False) else False,
+                        'line_ids': list_line,
+                    })
+
+                if move_id:
+                    self._cr.commit()
+                    _logger.info(f"Bank Transaction Create Sucessfully for {move_id.id}.")
+                if dict_obj.get('Status') == 'AUTHORISED':
+                    move_id.action_post()
+
+    def import_purchase_order(self):
+        """IMPORT PURCHASE ORDER FROM XERO TO ODOO"""
+        starting_page = 0
+        if self.xero_last_imported_po_page:
+            starting_page = self.xero_last_imported_po_page
+
+        if starting_page:
+            starting_page = starting_page - 1
+        _logger.info('starting_page: {} '.format(starting_page))
+        i = 0
+        count = 0
+        for i in range(starting_page, 10000):
+            if count == 10:
+                break
+            count += 1
+            # i += 1
+
+            if self:
+                res = self.po_main_function(i + 1)
+
+            _logger.info("RESPONSE : %s", res)
+            if not res:
+                break
+        _logger.info('last page: {} and page count : {}'.format(i, count))
+        self.xero_last_imported_po_page = i
+        self.x_purchaseorder_date = datetime.datetime.today().strftime(
+            '%Y-%m-%d')
+
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -2107,20 +3133,25 @@ class ResCompany(models.Model):
     def po_main_function(self, page_no):
         _logger.info("PURCHASE PAGE NO : %s", page_no)
         if self.x_purchaseorder_date:
-            date_from = datetime.datetime.strptime(str(self.x_purchaseorder_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_purchaseorder_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
         if date_from:
-            url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders?DateFrom=%s' % (date_from)
+            # url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders?DateFrom=%s' % (date_from)
+            url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders?DateFrom={}&page={}'.format(
+                date_from, str(page_no))
         else:
-            url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders?page=' + str(page_no)
+            url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders?page=' + \
+                  str(page_no)
 
         data = self.get_data(url)
         if data:
             recs = []
-
             parsed_dict = json.loads(data.text)
+            _logger.info(
+                'Parsed Dict+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ : {}'.format(parsed_dict))
             if parsed_dict.get('PurchaseOrders'):
                 record = parsed_dict.get('PurchaseOrders')
                 if isinstance(record, (dict,)):
@@ -2145,15 +3176,19 @@ class ResCompany(models.Model):
                                              cust.get('PurchaseOrderNumber'))
 
                 # print("record:::::::::::::::::::",record)
+
                 if self.x_purchaseorder_date:
-                    self.x_purchaseorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
-                    return False
+                    # self.x_purchaseorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    return True
+
                 return True
             else:
                 if page_no == 1:
-                    raise ValidationError('There is no any purchase order present in XERO.')
+                    raise ValidationError(
+                        'There is no any purchase order present in XERO.')
                 else:
-                    self.x_purchaseorder_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_purchaseorder_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
                     return False
 
         elif data.status_code == 401:
@@ -2175,8 +3210,16 @@ class ResCompany(models.Model):
                     if i.get('ItemCode'):
                         continue
                     else:
-                        return False
-        return True
+                        if not self.default_prod_po:
+                            raise ValidationError(
+                                _(f'Please configure the Default PO Product in the Company!'))
+                        else:
+                            if not self.default_prod_po.default_code:
+                                raise ValidationError(
+                                    _(f'Please set internal reference for {self.default_prod_po.name} product'))
+                            else:
+                                i['ItemCode'] = self.default_prod_po.default_code
+                return True
 
     @api.model
     def check_if_product_present(self, cust):
@@ -2192,14 +3235,24 @@ class ResCompany(models.Model):
                 else:
                     for i in cust.get('LineItems'):
                         if i.get('ItemCode'):
-                            return True
+                            continue
                         else:
-                            return False
+                            if not self.default_prod_so:
+                                raise ValidationError(
+                                    _(f'Please configure the Default SO Product in the Company!'))
+                            else:
+                                if not self.default_prod_so.default_code:
+                                    raise ValidationError(
+                                        _(f'Please set internal reference for {self.default_prod_so.name} product'))
+                                else:
+                                    i['ItemCode'] = self.default_prod_so.default_code
+                return True
 
     @api.model
     def create_imported_purchase_order(self, cust):
         purchase_order = self.env['purchase.order'].search(
-            [('xero_purchase_id', '=', cust.get('PurchaseOrderID')), ('company_id', '=', self.id)])
+            [('xero_purchase_id', '=', cust.get('PurchaseOrderID')),
+             ('state', 'not in', ['purchase', 'done', 'cancel']), ('company_id', '=', self.id)])
 
         if not purchase_order:
             res_partner = self.env['res.partner'].search(
@@ -2208,9 +3261,11 @@ class ResCompany(models.Model):
             if res_partner:
                 self.create_customer_for_purchase_order(cust, res_partner)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
 
                 if res_partner:
@@ -2220,14 +3275,18 @@ class ResCompany(models.Model):
             res_partner = self.env['res.partner'].search(
                 [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)], limit=1)
             if res_partner:
-                self.update_customer_for_purchase_order(cust, res_partner, purchase_order)
+                self.update_customer_for_purchase_order(
+                    cust, res_partner, purchase_order)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
                 if res_partner:
-                    self.update_customer_for_purchase_order(cust, res_partner, purchase_order)
+                    self.update_customer_for_purchase_order(
+                        cust, res_partner, purchase_order)
 
     @api.model
     def create_customer_for_purchase_order(self, cust, res_partner):
@@ -2274,16 +3333,20 @@ class ResCompany(models.Model):
                     'Status') == 'SUBMITTED':
                 so_obj.button_confirm()
 
-            _logger.info("Purchase Order Created successfully  PO = %s ", cust.get('PurchaseOrderNumber'))
+            _logger.info("Purchase Order Created successfully  PO = %s ", cust.get(
+                'PurchaseOrderNumber'))
         else:
-            _logger.info("Purchase Order Not Created successfully  PO = %s ", cust.get('PurchaseOrderNumber'))
+            _logger.info("Purchase Order Not Created successfully  PO = %s ", cust.get(
+                'PurchaseOrderNumber'))
 
         if cust.get('LineItems'):
             order_lines = cust.get('LineItems')
             if isinstance(order_lines, (dict,)):
                 i = cust.get('LineItems')
-                res_product = self.env['product.product'].search(
-                    [('default_code', '=', i.get('ItemCode'))])
+                res_product = None
+                if i.get('Item_code'):
+                    res_product = self.env['product.product'].search(
+                        [('default_code', '=', i.get('ItemCode'))])
                 if res_product:
                     self.create_purchase_order_line(i, so_obj, res_product)
                 else:
@@ -2292,13 +3355,18 @@ class ResCompany(models.Model):
                         res_product = self.env['product.product'].search(
                             [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
-                            self.create_purchase_order_line(i, so_obj, res_product)
+                            self.create_purchase_order_line(
+                                i, so_obj, res_product)
                     else:
                         _logger.info('[PO ORDER LINE] Item Code Not defined.')
+                        raise ValidationError(
+                            '[PO ORDER LINE] Item Code Not defined. Imported Product: {}'.format(i.get('Description')))
             else:
                 for i in cust.get('LineItems'):
-                    res_product = self.env['product.product'].search(
-                        [('default_code', '=', i.get('ItemCode'))])
+                    res_product = None
+                    if i.get('Item_code'):
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))])
                     if res_product:
                         self.create_purchase_order_line(i, so_obj, res_product)
                     else:
@@ -2307,9 +3375,14 @@ class ResCompany(models.Model):
                             res_product = self.env['product.product'].search(
                                 [('default_code', '=', i.get('ItemCode'))])
                             if res_product:
-                                self.create_purchase_order_line(i, so_obj, res_product)
+                                self.create_purchase_order_line(
+                                    i, so_obj, res_product)
                         else:
-                            _logger.info('[PO ORDER LINE] Item Code Not defined.')
+                            _logger.info(
+                                '[PO ORDER LINE] Item Code Not defined.')
+                            raise ValidationError(
+                                '[PO ORDER LINE] Item Code Not defined. Imported Product: {}'.format(
+                                    i.get('Description')))
 
     @api.model
     def update_customer_for_purchase_order(self, cust, res_partner, purchase_order):
@@ -2359,45 +3432,56 @@ class ResCompany(models.Model):
                 'Status') == 'SUBMITTED'):
                 purchase_order.button_confirm()
 
-            _logger.info("Purchase Order Updated successfully  PO = %s ", cust.get('PurchaseOrderNumber'))
+            _logger.info("Purchase Order Updated successfully  PO = %s ", cust.get(
+                'PurchaseOrderNumber'))
         else:
-            _logger.info("Purchase Order Not Updated successfully  PO = %s ", cust.get('PurchaseOrderNumber'))
-
+            _logger.info("Purchase Order Not Updated successfully  PO = %s ", cust.get(
+                'PurchaseOrderNumber'))
+        _logger.info('Record : {}'.format(cust))
         if cust.get('LineItems'):
             order_lines = cust.get('LineItems')
             if isinstance(order_lines, (dict,)):
                 i = cust.get('LineItems')
-                res_product = self.env['product.product'].search(
-                    [('default_code', '=', i.get('ItemCode'))])
+                res_product = None
+                if i.get('ItemCode'):
+                    res_product = self.env['product.product'].search(
+                        [('default_code', '=', i.get('ItemCode'))], limit=1)
                 if res_product:
-                    self.update_purchase_order_line(i, purchase_order, res_product, cust)
+                    self.update_purchase_order_line(
+                        i, purchase_order, res_product, cust)
                 else:
                     if i.get('ItemCode'):
                         self.fetch_the_required_product(i.get('ItemCode'))
                         res_product = self.env['product.product'].search(
-                            [('default_code', '=', i.get('ItemCode'))])
+                            [('default_code', '=', i.get('ItemCode'))], limit=1)
                         if res_product:
-                            self.update_purchase_order_line(i, purchase_order, res_product, cust)
+                            self.update_purchase_order_line(
+                                i, purchase_order, res_product, cust)
                     else:
                         _logger.info('[PO ORDER LINE] Item Code Not defined.')
 
             else:
                 for i in cust.get('LineItems'):
-                    res_product = self.env['product.product'].search(
-                        [('default_code', '=', i.get('ItemCode'))])
+                    res_product = None
+                    if i.get('ItemCode'):
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))], limit=1)
 
                     if res_product:
-                        self.update_purchase_order_line(i, purchase_order, res_product, cust)
+                        self.update_purchase_order_line(
+                            i, purchase_order, res_product, cust)
                     else:
                         if i.get('ItemCode'):
                             self.fetch_the_required_product(i.get('ItemCode'))
                             res_product = self.env['product.product'].search(
-                                [('default_code', '=', i.get('ItemCode'))])
+                                [('default_code', '=', i.get('ItemCode'))], limit=1)
 
                             if res_product:
-                                self.update_purchase_order_line(i, purchase_order, res_product, cust)
+                                self.update_purchase_order_line(
+                                    i, purchase_order, res_product, cust)
                         else:
-                            _logger.info('[PO ORDER LINE] Item Code Not defined.')
+                            _logger.info(
+                                '[PO ORDER LINE] Item Code Not defined.')
 
     @api.model
     def create_purchase_order_line(self, i, so_obj, res_product):
@@ -2464,6 +3548,22 @@ class ResCompany(models.Model):
             dict_l['price_unit'] = float(i.get('UnitAmount'))
         else:
             dict_l['price_unit'] = 0.0
+        if i.get('Tracking'):
+            analytic_id = []
+            analytic_obj = self.env['account.analytic.tag']
+            for analytic in i.get('Tracking'):
+                analytic_ids = analytic_obj.search(
+                    [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                     ('company_id', '=', self.id)], limit=1)
+                if analytic_ids:
+                    analytic_id.extend(analytic_ids.ids)
+                else:
+                    self.import_tracking_categories(analytic['TrackingCategoryID'])
+                    analytic_ids = analytic_obj.search(
+                        [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                         ('company_id', '=', self.id)], limit=1)
+                    analytic_id.extend(analytic_ids.ids)
+            dict_l['analytic_tag_ids'] = analytic_id
 
         if i.get('Description'):
             dict_l['name'] = i.get('Description')
@@ -2484,8 +3584,10 @@ class ResCompany(models.Model):
 
         if cust.get('DeliveryDateString'):
             xero_delivery_time = cust.get('DeliveryDateString').split("T")
-            xero_delivery_datetime = xero_delivery_time[0] + ' ' + xero_delivery_time[1]
-            xero_datetime = datetime.datetime.strptime(xero_delivery_datetime, '%Y-%m-%d %H:%M:%S')
+            xero_delivery_datetime = xero_delivery_time[
+                                         0] + ' ' + xero_delivery_time[1]
+            xero_datetime = datetime.datetime.strptime(
+                xero_delivery_datetime, '%Y-%m-%d %H:%M:%S')
             date_planned = xero_datetime
 
         else:
@@ -2678,7 +3780,9 @@ class ResCompany(models.Model):
         contact_name = ''
         temp_dict = {}
 
-        if (isinstance(new_dict, list)):
+        if isinstance(new_dict, list):
+            _logger.info('Contact Creation Parameters Information : {} {} {}'.format(
+                parent_id, con_id, new_dict))
             for val in new_dict:
                 if val.get('FirstName'):
                     firstname = val.get('FirstName')
@@ -2690,8 +3794,10 @@ class ResCompany(models.Model):
                     lastname = ''
                 contact_name = firstname + ' ' + lastname
                 temp_dict.update({'name': contact_name})
+
                 if val.get('EmailAddress', False):
                     temp_dict.update({'email': val.get('EmailAddress')})
+
                 if isinstance(parent_id, int):
                     temp_dict.update({'parent_id': parent_id})
                 else:
@@ -2711,7 +3817,7 @@ class ResCompany(models.Model):
                             [('parent_id', '=', parent_id), ('type', '=', 'contact'),
                              ('email', '=', val.get('EmailAddress')), ('company_id', '=', self.id)])
                         if not con_search:
-                            new_con = self.env['res.partner'].create(temp_dict)
+                            self.env['res.partner'].create(temp_dict)
                             self._cr.commit()
                         else:
                             con_search.write(temp_dict)
@@ -2723,8 +3829,9 @@ class ResCompany(models.Model):
             _logger.info("RESPONSE : %s", res)
 
             if not res:
-                break;
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                break
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -2767,6 +3874,8 @@ class ResCompany(models.Model):
             #
             parsed_dict = json.loads(data.text)
 
+            _logger.info('Parsed Dict : {}'.format(json.loads(data.text)))
+
             if parsed_dict.get('Contacts', False):
                 record = parsed_dict.get('Contacts')
                 if isinstance(record, (dict,)):
@@ -2777,7 +3886,8 @@ class ResCompany(models.Model):
                 return True
             else:
                 if page_no == 1:
-                    raise ValidationError('There is no any contact present in XERO.')
+                    raise ValidationError(
+                        'There is no any contact present in XERO.')
                 else:
                     return False
         elif data.status_code == 401:
@@ -2791,7 +3901,8 @@ class ResCompany(models.Model):
             customer = self.env['res.partner'].search(
                 ['|', ('xero_cust_id', '=', item.get('ContactID')),
                  ('ref', '=', item.get('AccountNumber'))])
-            customer_exists = self.env['res.partner'].search([('id', 'in', customer.ids), ('company_id', '=', self.id)])
+            customer_exists = self.env['res.partner'].search(
+                [('id', 'in', customer.ids), ('company_id', '=', self.id)])
         else:
 
             customer_exists = self.env['res.partner'].search(
@@ -2827,7 +3938,8 @@ class ResCompany(models.Model):
 
                 if type == 'DAYSAFTERBILLMONTH':
                     option = 'after_invoice_month'
-                    term_name = str(day) + ' day(s) after the end of the bill month'
+                    term_name = str(
+                        day) + ' day(s) after the end of the bill month'
 
                 if type == 'OFCURRENTMONTH':
                     option = 'day_current_month'
@@ -2837,7 +3949,8 @@ class ResCompany(models.Model):
                     option = 'day_following_month'
                     term_name = str(day) + ' of the following month'
 
-                payment_terms = self.env['account.payment.term'].search([('name','=',term_name)])
+                payment_terms = self.env['account.payment.term'].search(
+                    [('name', '=', term_name)])
                 if not payment_terms:
                     term_dict = {}
                     term_dict['name'] = term_name
@@ -2845,12 +3958,15 @@ class ResCompany(models.Model):
                                                      'days': day,
                                                      'option': option})]
 
-                    payment_terms = self.env['account.payment.term'].create(term_dict)
+                    payment_terms = self.env[
+                        'account.payment.term'].create(term_dict)
 
                     if payment_terms:
-                        dict_customer['property_supplier_payment_term_id'] = payment_terms.id
+                        dict_customer[
+                            'property_supplier_payment_term_id'] = payment_terms.id
                 else:
-                    dict_customer['property_supplier_payment_term_id'] = payment_terms.id
+                    dict_customer[
+                        'property_supplier_payment_term_id'] = payment_terms.id
 
             if item.get('PaymentTerms').get('Sales'):
                 type = item.get('PaymentTerms').get('Sales').get('Type')
@@ -2862,7 +3978,8 @@ class ResCompany(models.Model):
 
                 if type == 'DAYSAFTERBILLMONTH':
                     option = 'after_invoice_month'
-                    term_name = str(day) + ' day(s) after the end of the invoice month'
+                    term_name = str(
+                        day) + ' day(s) after the end of the invoice month'
 
                 if type == 'OFCURRENTMONTH':
                     option = 'day_current_month'
@@ -2872,29 +3989,34 @@ class ResCompany(models.Model):
                     option = 'day_following_month'
                     term_name = str(day) + ' of the following month'
 
-                payment_terms = self.env['account.payment.term'].search([('name','=',term_name)])
+                payment_terms = self.env['account.payment.term'].search(
+                    [('name', '=', term_name)])
                 if not payment_terms:
                     term_dict = {}
                     term_dict['name'] = term_name
                     term_dict['line_ids'] = [(0, 0, {'value': 'balance',
-                                              'days': day,
-                                              'option': option})]
+                                                     'days': day,
+                                                     'option': option})]
 
-                    payment_terms = self.env['account.payment.term'].create(term_dict)
+                    payment_terms = self.env[
+                        'account.payment.term'].create(term_dict)
 
                     if payment_terms:
-                        dict_customer['property_payment_term_id'] = payment_terms.id
+                        dict_customer[
+                            'property_payment_term_id'] = payment_terms.id
                 else:
-                    dict_customer['property_payment_term_id'] = payment_terms.id
+                    dict_customer[
+                        'property_payment_term_id'] = payment_terms.id
 
         if item.get('Name'):
             dict_customer.update({'name': item.get('Name')})
             dict_customer.update({'xero_cust_id': item.get('ContactID')})
 
         if item.get('Addresses'):
-            _logger.info('\n\nContact Address :\n {}'.format(item.get('Addresses')))
+            _logger.info(
+                '\n\nContact Address :\n {}'.format(item.get('Addresses')))
             for address in item.get('Addresses'):
-                if address.get('AddressType',False):
+                if address.get('AddressType', False):
                     if address.get('AddressType') == 'POBOX':
                         street1 = ''
                         street2 = ''
@@ -2906,15 +4028,19 @@ class ResCompany(models.Model):
                         if address.get('AddressLine2'):
                             street2 = address.get('AddressLine2')
                         if address.get('AddressLine3'):
-                            street2 = street2 + '\n' + address.get('AddressLine3')
+                            street2 = street2 + '\n' + \
+                                      address.get('AddressLine3')
                         if address.get('AddressLine4'):
-                            street2 = street2 + '\n' + address.get('AddressLine4')
+                            street2 = street2 + '\n' + \
+                                      address.get('AddressLine4')
 
                         if address.get('Country'):
                             if len(address.get('Country')) == 2:
-                                country = self.env['res.country'].search([('code', '=ilike', address.get('Country'))],limit=1)
+                                country = self.env['res.country'].search(
+                                    [('code', '=ilike', address.get('Country'))], limit=1)
                             else:
-                                country = self.env['res.country'].search([('name', 'ilike', address.get('Country'))],limit=1)
+                                country = self.env['res.country'].search(
+                                    [('name', 'ilike', address.get('Country'))], limit=1)
 
                             if not country:
                                 if len(address.get('Country')) == 2:
@@ -2941,28 +4067,27 @@ class ResCompany(models.Model):
                                         [('name', 'ilike', address.get('Country').title())], limit=1)
 
                             if not country:
-                                country = self.env['res.country'].search(
-                                    [('alias_ids.name', '=', address.get('Country'))], limit=1)
-
-                            if not country:
-                                raise UserError('Country Not Found : ' + address.get('Country') + '\nContact Name : ' + item.get('Name'))
+                                raise UserError(
+                                    'Country Not Found : ' + address.get('Country') + '\nContact Name : ' + item.get(
+                                        'Name'))
 
                         if address.get('Region'):
                             # Find state by name
-                            state = self.env['res.country.state'].search([('name','=ilike',address.get('Region'))])
+                            state = self.env['res.country.state'].search(
+                                [('name', '=ilike', address.get('Region'))], limit=1)
 
                             if not state:
                                 state = self.env['res.country.state'].search(
-                                    [('name', '=ilike', address.get('Region').title())])
+                                    [('name', '=ilike', address.get('Region').title())], limit=1)
                             if not state:
                                 state = self.env['res.country.state'].search(
-                                    [('name', '=ilike', address.get('Region').lower())])
+                                    [('name', '=ilike', address.get('Region').lower())], limit=1)
                             if not state:
                                 state = self.env['res.country.state'].search(
-                                    [('name', '=ilike', address.get('Region').upper())])
+                                    [('name', '=ilike', address.get('Region').upper())], limit=1)
 
                             # if not state:
-                            #     # Find state by its code
+                            # Find state by its code
                             #     state = self.env['res.country.state'].search([('code', '=', address.get('Region'))])
                             #     if state:
                             #         if len(state) > 1:
@@ -2978,19 +4103,20 @@ class ResCompany(models.Model):
                             if not state:
                                 if country:
                                     state = self.env['res.country.state'].search(
-                                        [('code', '=', address.get('Region')),('country_id','=',country.id)])
+                                        [('code', '=', address.get('Region')), ('country_id', '=', country.id)],
+                                        limit=1)
                                     if not state:
                                         state = self.env['res.country.state'].search(
                                             [('code', '=', address.get('Region').lower()),
-                                             ('country_id', '=', country.id)])
+                                             ('country_id', '=', country.id)], limit=1)
                                     if not state:
                                         state = self.env['res.country.state'].search(
                                             [('code', '=', address.get('Region').upper()),
-                                             ('country_id', '=', country.id)])
+                                             ('country_id', '=', country.id)], limit=1)
                                     if not state:
                                         state = self.env['res.country.state'].search(
                                             [('code', '=', address.get('Region').title()),
-                                             ('country_id', '=', country.id)])
+                                             ('country_id', '=', country.id)], limit=1)
                                     #
                                     # if not state:
                                     #     countries = self.env['res.country'].search([('name', 'ilike', address.get('Country'))])
@@ -3006,10 +4132,12 @@ class ResCompany(models.Model):
                                     #                 break
 
                                     if not state:
-                                        _logger.info('\nState Not Found: ' + address.get('Region') + '\nCountry Name: ' + country.name + '\nContact Name: ' + item.get('Name'))
+                                        raise UserError('\nState Not Found : ' + address.get(
+                                            'Region') + '\nCountry Name : ' + country.name + '\nContact Name : ' + item.get(
+                                            'Name'))
 
                         dict_customer.update({
-                            'street':street1,
+                            'street': street1,
                             'street2': street2,
                             'city': address.get('City'),
                             'zip': address.get('PostalCode'),
@@ -3022,14 +4150,31 @@ class ResCompany(models.Model):
                 if phones.get('PhoneType', False):
                     if phones.get('PhoneType') == 'DEFAULT' and phones.get('PhoneNumber',
                                                                            False):
-                        phone_str = phones.get('PhoneNumber')
+                        phone_str = ''
+                        if phones.get('PhoneCountryCode'):
+                            phone_str = '{}-'.format(
+                                phones.get('PhoneCountryCode'))
+
+                        if 'PhoneAreaCode' in phones and phones.get('PhoneAreaCode'):
+                            phone_str += '{}-'.format(
+                                phones.get('PhoneAreaCode'))
+
+                        phone_str += phones.get('PhoneNumber')
                         dict_customer.update({'phone': phone_str})
                     if phones.get('PhoneType') == 'MOBILE' and phones.get('PhoneNumber',
                                                                           False):
+                        phone_str = ''
+                        if phones.get('PhoneCountryCode'):
+                            phone_str = '{}-'.format(
+                                phones.get('PhoneCountryCode'))
+
+                        if 'PhoneAreaCode' in phones and phones.get('PhoneAreaCode'):
+                            phone_str += '{}-'.format(
+                                phones.get('PhoneAreaCode'))
+
                         phone_str = phones.get('PhoneNumber')
                         dict_customer.update({'mobile': phone_str})
         dict_customer.update({'company_id': int(self.id)})
-
         if not customer_exists:
             create_cust = self.env['res.partner'].create(dict_customer)
         else:
@@ -3038,18 +4183,41 @@ class ResCompany(models.Model):
         if item.get('ContactPersons'):
             new_dict = item.get('ContactPersons')
             if not customer_exists:
-                self.create_contact(create_cust.id, item.get('ContactID'), new_dict)
+                self.create_contact(
+                    create_cust.id, item.get('ContactID'), new_dict)
             else:
-                self.create_contact(customer_exists[0].id, item.get('ContactID'), new_dict)
+                self.create_contact(
+                    customer_exists[0].id, item.get('ContactID'), new_dict)
 
     def import_credit_notes(self):
         """IMPORT CREDIT NOTES(Customer refund bill and vendor refund bill) FROM XERO TO ODOO"""
-        for i in range(10000):
+        starting_page = 0
+        if self.xero_last_imported_credit_note_page:
+            starting_page = self.xero_last_imported_credit_note_page
+
+        if starting_page:
+            starting_page = starting_page - 1
+
+        _logger.info('starting_page: {} '.format(starting_page))
+
+        i = 0
+        count = 0
+        for i in range(starting_page, 10000):
+            if count == 10:
+                break
+            count += 1
+
             res = self.cn_main_function(i + 1)
             _logger.info("RESPONSE : %s", res)
             if not res:
-                break;
-        success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view', False)
+                break
+
+        self.xero_last_imported_credit_note_page = i
+        self.x_credit_note_date = datetime.datetime.today().strftime(
+            '%Y-%m-%d')
+
+        success_form = self.env.ref(
+            'pragmatic_odoo_xero_connector.import_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -3066,7 +4234,8 @@ class ResCompany(models.Model):
         _logger.info("CREDIT NOTE PAGE NO : %s", page_no)
 
         if self.x_credit_note_date:
-            date_from = datetime.datetime.strptime(str(self.x_credit_note_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_credit_note_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
@@ -3074,7 +4243,8 @@ class ResCompany(models.Model):
             url = 'https://api.xero.com/api.xro/2.0/CreditNotes?page=' + str(
                 page_no) + '&where=Date>=DateTime(%s,%s,%s)' % (date_from.year, date_from.month, date_from.day)
         else:
-            url = 'https://api.xero.com/api.xro/2.0/CreditNotes?page=' + str(page_no)
+            url = 'https://api.xero.com/api.xro/2.0/CreditNotes?page=' + \
+                  str(page_no)
         data = self.get_data(url)
 
         if data:
@@ -3097,9 +4267,11 @@ class ResCompany(models.Model):
                     return True
             else:
                 if page_no == 1:
-                    raise ValidationError('There is no any credit note present in XERO.')
+                    raise ValidationError(
+                        'There is no any credit note present in XERO.')
                 else:
-                    self.x_credit_note_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_credit_note_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
                     return False
         elif data.status_code == 401:
             raise ValidationError(
@@ -3108,8 +4280,10 @@ class ResCompany(models.Model):
     @api.model
     def create_imported_credit_notes(self, cust):
         if cust.get('CreditNoteNumber'):
-            _logger.info("PROCESSING CREDIT NOTE NUMBER : %s", cust.get('CreditNoteNumber'))
-        _logger.info("PROCESSING CREDIT NOTE ID : %s", cust.get('CreditNoteID'))
+            _logger.info(
+                "PROCESSING CREDIT NOTE NUMBER : %s", cust.get('CreditNoteNumber'))
+        _logger.info(
+            "PROCESSING CREDIT NOTE ID : %s", cust.get('CreditNoteID'))
 
         account_invoice = self.env['account.move'].search(
             [('xero_invoice_id', '=', cust.get('CreditNoteID')), ('company_id', '=', self.id)])
@@ -3121,9 +4295,11 @@ class ResCompany(models.Model):
             if res_partner:
                 self.create_customer_for_credit_note(cust, res_partner)
             else:
-                self.fetch_the_required_customer(cust.get('Contact').get('ContactID'))
+                self.fetch_the_required_customer(
+                    cust.get('Contact').get('ContactID'))
                 res_partner2 = self.env['res.partner'].search(
-                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')), ('company_id', '=', self.id)],
+                    [('xero_cust_id', '=', cust.get('Contact').get('ContactID')),
+                     ('company_id', '=', self.id)],
                     limit=1)
 
                 if res_partner2:
@@ -3152,19 +4328,22 @@ class ResCompany(models.Model):
             dict_i['company_id'] = self.id
 
         if cust.get('CurrencyCode'):
-            currency = self.env['res.currency'].search([('name', '=', cust.get('CurrencyCode')),('active', 'in', [True, False])], limit=1)
+            currency = self.env['res.currency'].search(
+                [('name', '=', cust.get('CurrencyCode')), ('active', 'in', [True, False])], limit=1)
             if not currency.active:
                 currency.write({'active': True})
 
             dict_i['currency_id'] = currency.id
 
         if cust.get('Type') == 'ACCRECCREDIT':
-            sale = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
+            sale = self.env['account.journal'].search(
+                [('type', '=', 'sale')], limit=1)
             if sale:
                 dict_i['journal_id'] = sale.id
 
         if cust.get('Type') == 'ACCPAYCREDIT':
-            purchase = self.env['account.journal'].search([('type', '=', 'purchase')], limit=1)
+            purchase = self.env['account.journal'].search(
+                [('type', '=', 'purchase')], limit=1)
             if purchase:
                 dict_i['journal_id'] = purchase.id
 
@@ -3211,18 +4390,21 @@ class ResCompany(models.Model):
                     invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust, invoice_type,
                                                                              tax_state)
                 else:
-                    res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                    res_product = self.env['product.product'].search(
+                        [('default_code', '=', i.get('ItemCode'))])
                     if res_product:
                         invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust, invoice_type,
                                                                                  tax_state)
                     else:
                         self.fetch_the_required_product(i.get('ItemCode'))
-                        res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
                             invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust, invoice_type,
                                                                                      tax_state)
                 if invoice_line_vals:
-                    dict_i['invoice_line_ids'].append((0, 0, invoice_line_vals))
+                    dict_i['invoice_line_ids'].append(
+                        (0, 0, invoice_line_vals))
 
             else:
                 for i in cust.get('LineItems'):
@@ -3231,24 +4413,27 @@ class ResCompany(models.Model):
                         invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust, invoice_type,
                                                                                  tax_state)
                     else:
-                        res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                        res_product = self.env['product.product'].search(
+                            [('default_code', '=', i.get('ItemCode'))])
                         if res_product:
                             invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust, invoice_type,
                                                                                      tax_state)
                         else:
                             self.fetch_the_required_product(i.get('ItemCode'))
-                            res_product = self.env['product.product'].search([('default_code', '=', i.get('ItemCode'))])
+                            res_product = self.env['product.product'].search(
+                                [('default_code', '=', i.get('ItemCode'))])
                             if res_product:
                                 invoice_line_vals = self.create_credit_note_invoice_line(i, res_product, cust,
                                                                                          invoice_type, tax_state)
                     if invoice_line_vals:
-                        dict_i['invoice_line_ids'].append((0, 0, invoice_line_vals))
-
+                        dict_i['invoice_line_ids'].append(
+                            (0, 0, invoice_line_vals))
         invoice_obj = self.env['account.move'].create(dict_i)
         if invoice_obj:
             if invoice_obj.state == 'draft':
                 invoice_obj.action_post()
-            _logger.info("\nCredit Note Created Successfully...!!! CN = %s", cust.get('CreditNoteNumber'))
+            _logger.info(
+                "\nCredit Note Created Successfully...!!! CN = %s", cust.get('CreditNoteNumber'))
 
     @api.model
     def create_credit_note_invoice_line(self, i, res_product, cust, invoice_type, tax_state):
@@ -3361,6 +4546,23 @@ class ResCompany(models.Model):
         else:
             dict_ol['quantity'] = 0
 
+        if i.get('Tracking'):
+            analytic_id = []
+            analytic_obj = self.env['account.analytic.tag']
+            for analytic in i.get('Tracking'):
+                analytic_ids = analytic_obj.search(
+                    [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                     ('company_id', '=', self.id)], limit=1)
+                if analytic_ids:
+                    analytic_id.extend(analytic_ids.ids)
+                else:
+                    self.import_tracking_categories(analytic['TrackingCategoryID'])
+                    analytic_ids = analytic_obj.search(
+                        [('name', '=', analytic['Option']), ('xero_tracking_opt_id', '!=', False),
+                         ('company_id', '=', self.id)], limit=1)
+                    analytic_id.extend(analytic_ids.ids)
+            dict_ol['analytic_tag_ids'] = analytic_id
+
         if i.get('UnitAmount'):
             dict_ol['price_unit'] = i.get('UnitAmount')
 
@@ -3383,7 +4585,8 @@ class ResCompany(models.Model):
                     dict_ol['account_id'] = acc_id_s1.id
         elif not i.get('AccountCode') and not i.get('Quantity') and not i.get('UnitAmount'):
             if not self.default_account:
-                raise ValidationError('PLease Set the Default Account in Xero Configuration.')
+                raise ValidationError(
+                    'PLease Set the Default Account in Xero Configuration.')
 
             if self.default_account:
                 dict_ol['account_id'] = self.default_account.id
@@ -3391,7 +4594,8 @@ class ResCompany(models.Model):
                 dict_ol['price_unit'] = 0.0
         elif not i.get('AccountCode') and not i.get('ItemCode'):
             if not self.default_account:
-                raise ValidationError('PLease Set the Default Account in Xero Configuration.')
+                raise ValidationError(
+                    'PLease Set the Default Account in Xero Configuration.')
 
             if self.default_account:
                 dict_ol['account_id'] = self.default_account.id
@@ -3409,19 +4613,25 @@ class ResCompany(models.Model):
             if invoice_type == 'out_refund':
                 if res_product:
                     if res_product.property_account_income_id:
-                        dict_ol['account_id'] = res_product.property_account_income_id.id
+                        dict_ol[
+                            'account_id'] = res_product.property_account_income_id.id
                         _logger.info("PRODUCT has income account set")
                     else:
-                        dict_ol['account_id'] = res_product.categ_id.property_account_income_categ_id.id
-                        _logger.info("No Income account was set, taking from product category..")
+                        dict_ol[
+                            'account_id'] = res_product.categ_id.property_account_income_categ_id.id
+                        _logger.info(
+                            "No Income account was set, taking from product category..")
             else:
                 if res_product:
                     if res_product.property_account_expense_id:
-                        dict_ol['account_id'] = res_product.property_account_expense_id.id
+                        dict_ol[
+                            'account_id'] = res_product.property_account_expense_id.id
                         _logger.info("PRODUCT has income account set")
                     else:
-                        dict_ol['account_id'] = res_product.categ_id.property_account_expense_categ_id.id
-                        _logger.info("No Income account was set, taking from product category..")
+                        dict_ol[
+                            'account_id'] = res_product.categ_id.property_account_expense_categ_id.id
+                        _logger.info(
+                            "No Income account was set, taking from product category..")
 
         return dict_ol
 
@@ -3455,7 +4665,8 @@ class ResCompany(models.Model):
         """IMPORT PAYMENTS(Customer payments and Vendor payments) FROM XERO TO ODOO"""
 
         if self.x_payments_date:
-            date_from = datetime.datetime.strptime(str(self.x_payments_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_payments_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
@@ -3478,12 +4689,13 @@ class ResCompany(models.Model):
                         if not record.get('Status') == 'DELETED':
                             self.create_imported_payments(record)
                     else:
-                        for grp in record:
+                        for grp in parsed_dict.get('Payments'):
                             if not grp.get('Status') == 'DELETED':
                                 self.create_imported_payments(grp)
                     success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view',
                                                 False)
-                    self.x_payments_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_payments_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
 
                     return {
                         'name': _('Notification'),
@@ -3496,7 +4708,8 @@ class ResCompany(models.Model):
                         'target': 'new',
                     }
             else:
-                raise ValidationError('There is no any payment present in XERO.')
+                raise ValidationError(
+                    'There is no any payment present in XERO.')
 
         elif data.status_code == 401:
             raise ValidationError(
@@ -3524,10 +4737,38 @@ class ResCompany(models.Model):
         else:
             dict_g['amount'] = 0.0
 
+        if pay.get('Invoice'):
+            if pay.get('Invoice').get('CurrencyCode'):
+                if self.currency_id.name != pay.get('Invoice').get('CurrencyCode'):
+                    currency_obj = self.env['res.currency'].search(
+                        [('name', '=', pay.get('Invoice').get('CurrencyCode'))], limit=1)
+                    if currency_obj:
+                        dict_g['currency_id'] = currency_obj.id
+                        if pay.get('Date'):
+                            payment_date = self.compute_payment_date(pay.get('Date'))
+                            payment_date_a = payment_date.split('T')
+                            converted_date = datetime.datetime.strptime(
+                                payment_date_a[0], '%Y-%m-%d')
+                            date_list = []
+                            for line in currency_obj.rate_ids:
+                                date_list.append(datetime.datetime.strptime(
+                                    str(line.name), '%Y-%m-%d'))
+                            if converted_date not in date_list:
+                                rate1 = self.env['res.currency.rate'].create({
+                                    'name': converted_date,
+                                    'company_rate': pay.get('CurrencyRate', False),
+                                    'currency_id': currency_obj.id,
+                                    'company_id': self.env.company.id,
+                                })
+                    else:
+                        raise ValidationError(
+                            f"Please Activate the currency {pay.get('Invoice').get('CurrencyCode')}.")
+
         if pay.get('Date'):
             payment_date = self.compute_payment_date(pay.get('Date'))
             payment_date_a = payment_date.split('T')
-            converted_date = datetime.datetime.strptime(payment_date_a[0], '%Y-%m-%d')
+            converted_date = datetime.datetime.strptime(
+                payment_date_a[0], '%Y-%m-%d')
 
             dict_g['date'] = converted_date
 
@@ -3545,7 +4786,8 @@ class ResCompany(models.Model):
                     ['|', ('xero_invoice_id', '=', pay.get('Invoice').get('InvoiceID')),
                      ('name', '=', pay.get('Invoice').get('InvoiceNumber'))])
                 _logger.info('\n\n\nInvoice Found : {}'.format(inv.ids))
-                invoices = self.env['account.move'].search([('id', 'in', inv.ids), ('company_id', '=', self.id)])
+                invoices = self.env['account.move'].search(
+                    [('id', 'in', inv.ids), ('company_id', '=', self.id)])
                 _logger.info('invoices : {}'.format(invoices))
 
                 invoice_pay = invoices and invoices[0]
@@ -3555,7 +4797,9 @@ class ResCompany(models.Model):
 
                 if invoice_pay and pay.get('Invoice').get('Type') and pay.get('Invoice').get('Type') not in [
                     'APPREPAYMENT', 'ARPREPAYMENT', 'APOVERPAYMENT', 'AROVERPAYMENT']:
-                    # Because of this line the invoice gets reconciled i.e the invoice for which this payment is done will be set to paid state
+                    # Because of this line the invoice gets reconciled i.e the
+                    # invoice for which this payment is done will be set to
+                    # paid state
                     if invoice_pay.state == 'draft':
                         invoice_pay.action_post()
 
@@ -3565,11 +4809,14 @@ class ResCompany(models.Model):
                     _logger.info('[Payment] ODOO INVOICE :: %s', invoice_pay)
 
                     if invoice_pay.partner_id.parent_id:
-                        dict_g['partner_id'] = invoice_pay.partner_id.parent_id.id
-                        _logger.info('[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
+                        dict_g[
+                            'partner_id'] = invoice_pay.partner_id.parent_id.id
+                        _logger.info(
+                            '[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
                     else:
                         dict_g['partner_id'] = invoice_pay.partner_id.id
-                        _logger.info('[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
+                        _logger.info(
+                            '[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
                 else:
                     if pay.get('Invoice').get('Contact'):
                         if pay.get('Invoice').get('Contact').get('ContactID'):
@@ -3580,23 +4827,30 @@ class ResCompany(models.Model):
                                  ('company_id', '=', self.id)], limit=1)
                             if customer_id:
                                 if customer_id.parent_id:
-                                    dict_g['partner_id'] = customer_id.parent_id.id
-                                    _logger.info('[Payment] existing CUSTOMER :parent :: %s', customer_id)
+                                    dict_g[
+                                        'partner_id'] = customer_id.parent_id.id
+                                    _logger.info(
+                                        '[Payment] existing CUSTOMER :parent :: %s', customer_id)
                                 else:
                                     dict_g['partner_id'] = customer_id.id
-                                    _logger.info('[Payment] existing CUSTOMER :child :: %s', customer_id)
+                                    _logger.info(
+                                        '[Payment] existing CUSTOMER :child :: %s', customer_id)
                             else:
-                                self.fetch_the_required_customer(pay.get('Invoice').get('Contact').get('ContactID'))
+                                self.fetch_the_required_customer(
+                                    pay.get('Invoice').get('Contact').get('ContactID'))
                                 res_partner = self.env['res.partner'].search(
                                     [('xero_cust_id', '=', pay.get('Invoice').get('Contact').get('ContactID')),
                                      ('company_id', '=', self.id)], limit=1)
                                 if res_partner:
                                     if res_partner.parent_id:
-                                        dict_g['partner_id'] = res_partner.parent_id.id
-                                        _logger.info('[Payment] CUSTOMER :parent :: %s', res_partner)
+                                        dict_g[
+                                            'partner_id'] = res_partner.parent_id.id
+                                        _logger.info(
+                                            '[Payment] CUSTOMER :parent :: %s', res_partner)
                                     else:
                                         dict_g['partner_id'] = res_partner.id
-                                        _logger.info('[Payment] CUSTOMER :child :: %s', res_partner)
+                                        _logger.info(
+                                            '[Payment] CUSTOMER :child :: %s', res_partner)
                 if pay.get('PaymentType') == 'ACCRECPAYMENT':
                     dict_g['partner_type'] = 'customer'
                     # Receive money - Inbound
@@ -3627,17 +4881,8 @@ class ResCompany(models.Model):
                     pay_type = 'purchase'
 
                 if 'partner_id' in dict_g:
-                    journal_id = self.env['account.journal'].get_journal_from_account(pay.get('Account').get('Code'))
-                    if not journal_id:
-                        if pay.get('Invoice') and pay.get('Invoice').get('InvoiceNumber'):
-                            _logger.info(_(
-                                "Payment journal is not defined for XERO's Account '%s' while trying to create payment for Xero invoice '%s'." % (
-                                    str(pay.get('Account').get('Code')), str(pay.get('Invoice').get('InvoiceNumber')))))
-                        else:
-                            _logger.info(_(
-                                "Payment journal is not defined for XERO's Account '%s'." % (
-                                    str(pay.get('Account').get('Code')))))
-                        return
+                    journal_id = self.env['account.journal'].get_journal_from_account(
+                        pay.get('Account').get('Code'))
                     dict_g['journal_id'] = journal_id.id
 
                     payment_type = 'inbound' if pay_type == 'sale' else 'outbound'
@@ -3645,20 +4890,30 @@ class ResCompany(models.Model):
                     journal = journal_id[0]
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_in')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_in')
                         journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_out')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_out')
                         journal_payment_methods = journal.outbound_payment_method_line_ids
+                    if len(journal_payment_methods) > 1:
+                        journal_payment_methods = journal_payment_methods.filtered(
+                            lambda l: l.payment_method_id.code == 'manual')
+                        if not journal_payment_methods:
+                            journal_payment_methods = journal_payment_methods[0]
 
                     if payment_method:
-                        dict_g['payment_method_line_id'] = journal_payment_methods.id
+                        dict_g[
+                            'payment_method_line_id'] = journal_payment_methods.id
 
-                    _logger.info('\n\n\nPayment Method : {} {} {}'.format(payment_method,journal_payment_methods.payment_method_id.ids,journal_payment_methods))
+                    _logger.info('\n\n\nPayment Method : {} {} {}'.format(
+                        payment_method, journal_payment_methods.payment_method_id.ids, journal_payment_methods))
                     if payment_method not in journal_payment_methods.payment_method_id:
                         self._cr.commit()
-                        raise ValidationError(_('No appropriate payment method enabled on journal %s') % journal.name)
+                        raise ValidationError(
+                            _('No appropriate payment method enabled on journal %s') % journal.name)
         if not acc_pay:
             if 'partner_id' in dict_g:
                 if 'journal_id' not in dict_g:
@@ -3666,22 +4921,32 @@ class ResCompany(models.Model):
                 else:
                     _logger.info('\n\n[Payment] DICTIONARY :: %s', dict_g)
                     if invoice_pay:
-                        if invoice_pay.payment_state != 'paid' and invoice_pay.state != 'cancel':
-                            if dict_g['date']:
-                                dict_g['payment_date'] = dict_g['date']
-                                del dict_g['date']
-                            register_payments = self.env['account.payment.register'].with_context(
-                                active_model='account.move',
-                                active_ids=invoice_pay.id).create(dict_g)
-                            payment_id = register_payments._create_payments()
-                            if pay.get('PaymentID') and payment_id:
-                                payment_id.xero_payment_id = pay.get('PaymentID')
+                        if dict_g['date']:
+                            dict_g['payment_date'] = dict_g['date']
+                            del dict_g['date']
+                        try:
+                            if invoice_pay.amount_residual > 0:
+                                register_payments = self.env['account.payment.register'].with_context(
+                                    active_model='account.move',
+                                    active_ids=invoice_pay.id).create(dict_g)
+                                payment_id = register_payments._create_payments()
+                                if pay.get('PaymentID') and payment_id:
+                                    payment_id.xero_payment_id = pay.get('PaymentID')
+                            else:
+                                payment_id = self.env['account.payment'].create({
+                                    'amount': dict_g['amount'],
+                                    'date': dict_g['payment_date'],
+                                    'partner_id': dict_g['partner_id'],
+                                    'payment_type': dict_g['payment_type'],
+                                    'partner_type': dict_g['partner_type'],
+                                })
+                                if pay.get('PaymentID') and payment_id:
+                                    payment_id.xero_payment_id = pay.get('PaymentID')
+                                payment_id.action_post()
+                        except:
+                            pass
 
-                            self._cr.commit()
-                        else:
-                            _logger.info(
-                                "Payment couldn't be created for %s as it was already marked as 'paid' within Odoo, or was cancelled within Odoo." % (
-                                    invoice_pay.display_name))
+                        self._cr.commit()
                     else:
                         if pay.get('PaymentID'):
                             dict_g['xero_payment_id'] = pay.get('PaymentID')
@@ -3697,7 +4962,8 @@ class ResCompany(models.Model):
         """IMPORT PREPAYMENTS(Customer payments and Vendor payments) FROM XERO TO ODOO"""
 
         if self.x_prepayments_date:
-            date_from = datetime.datetime.strptime(str(self.x_prepayments_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_prepayments_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
@@ -3724,7 +4990,8 @@ class ResCompany(models.Model):
                                 self.create_imported_prepayments(grp)
                     success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view',
                                                 False)
-                    self.x_prepayments_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_prepayments_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
 
                     return {
                         'name': _('Notification'),
@@ -3740,7 +5007,8 @@ class ResCompany(models.Model):
                 raise UserError('There is no any payment present in XERO.')
 
         elif data.status_code == 401:
-            raise UserError('Time Out..!!\n Please check your connection or error in application or refresh token.')
+            raise UserError(
+                'Time Out..!!\n Please check your connection or error in application or refresh token.')
 
     @api.model
     def create_imported_prepayments(self, pay):
@@ -3781,16 +5049,22 @@ class ResCompany(models.Model):
 
                                 dict_g['communication'] = invoice_pay.name
                                 # dict_g['invoice_ids'] = [(4, invoice_pay.id, None)]
-                                _logger.info('[Payment] ODOO INVOICE :: %s', invoice_pay)
+                                _logger.info(
+                                    '[Payment] ODOO INVOICE :: %s', invoice_pay)
 
                                 if invoice_pay.partner_id.parent_id:
-                                    dict_g['partner_id'] = invoice_pay.partner_id.parent_id.id
-                                    _logger.info('[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
+                                    dict_g[
+                                        'partner_id'] = invoice_pay.partner_id.parent_id.id
+                                    _logger.info(
+                                        '[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
                                 else:
-                                    dict_g['partner_id'] = invoice_pay.partner_id.id
-                                    _logger.info('[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
+                                    dict_g[
+                                        'partner_id'] = invoice_pay.partner_id.id
+                                    _logger.info(
+                                        '[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
                             else:
-                                dict_g['partner_id'] = self.get_payment_contact(pay)
+                                dict_g['partner_id'] = self.get_payment_contact(
+                                    pay)
 
                             if pay.get('Type') == 'RECEIVE-PREPAYMENT':
                                 dict_g['partner_type'] = 'customer'
@@ -3803,7 +5077,8 @@ class ResCompany(models.Model):
 
                             if 'partner_id' in dict_g:
                                 if not self.prepayment_journal:
-                                    raise UserError("Prepayment journal is not defined in the configuration.")
+                                    raise UserError(
+                                        "Prepayment journal is not defined in the configuration.")
                                 journal_id = self.prepayment_journal
                                 dict_g['journal_id'] = journal_id.id
 
@@ -3812,15 +5087,23 @@ class ResCompany(models.Model):
                                 journal = journal_id[0]
                                 if payment_type == 'inbound':
                                     dict_g['payment_type'] = 'inbound'
-                                    payment_method = self.env.ref('account.account_payment_method_manual_in')
+                                    payment_method = self.env.ref(
+                                        'account.account_payment_method_manual_in')
                                     journal_payment_methods = journal.inbound_payment_method_line_ids
                                 else:
                                     dict_g['payment_type'] = 'outbound'
-                                    payment_method = self.env.ref('account.account_payment_method_manual_out')
+                                    payment_method = self.env.ref(
+                                        'account.account_payment_method_manual_out')
                                     journal_payment_methods = journal.outbound_payment_method_line_ids
+                                if len(journal_payment_methods) > 1:
+                                    journal_payment_methods = journal_payment_methods.filtered(
+                                        lambda l: l.payment_method_id.code == 'manual')
+                                    if not journal_payment_methods:
+                                        journal_payment_methods = journal_payment_methods[0]
 
                                 if payment_method:
-                                    dict_g['payment_method_line_id'] = journal_payment_methods.id
+                                    dict_g[
+                                        'payment_method_line_id'] = journal_payment_methods.id
 
                                 if payment_method not in journal_payment_methods.payment_method_id:
                                     self._cr.commit()
@@ -3847,12 +5130,14 @@ class ResCompany(models.Model):
                             if invoice_pay:
                                 if invoice_pay.name:
                                     if communication:
-                                        communication = communication + ',' + invoice_pay.name
+                                        communication = communication + \
+                                                        ',' + invoice_pay.name
                                     else:
                                         communication = invoice_pay.name
 
                                 invoice_ids.append(invoice_pay.id)
-                                _logger.info('[Payment] ODOO INVOICE :: %s', invoice_pay)
+                                _logger.info(
+                                    '[Payment] ODOO INVOICE :: %s', invoice_pay)
 
                                 # partner_id = self.get_payment_contact(pay)
 
@@ -3877,7 +5162,8 @@ class ResCompany(models.Model):
 
                 if 'partner_id' in dict_g:
                     if not self.prepayment_journal:
-                        raise UserError("Prepayment journal is not defined in the configuration.")
+                        raise UserError(
+                            "Prepayment journal is not defined in the configuration.")
                     journal_id = self.prepayment_journal
                     dict_g['journal_id'] = journal_id.id
 
@@ -3886,15 +5172,24 @@ class ResCompany(models.Model):
                     journal = journal_id[0]
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_in')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_in')
                         journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_out')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_out')
                         journal_payment_methods = journal.outbound_payment_method_line_ids
 
+                    if len(journal_payment_methods) > 1:
+                        journal_payment_methods = journal_payment_methods.filtered(
+                            lambda l: l.payment_method_id.code == 'manual')
+                        if not journal_payment_methods:
+                            journal_payment_methods = journal_payment_methods[0]
+
                     if payment_method:
-                        dict_g['payment_method_line_id'] = journal_payment_methods.id
+                        dict_g[
+                            'payment_method_line_id'] = journal_payment_methods.id
 
                     if payment_method not in journal_payment_methods.payment_method_id:
                         self._cr.commit()
@@ -3915,7 +5210,8 @@ class ResCompany(models.Model):
 
             if 'partner_id' in dict_g:
                 if not self.prepayment_journal:
-                    raise UserError("Prepayment journal is not defined in the configuration.")
+                    raise UserError(
+                        "Prepayment journal is not defined in the configuration.")
                 journal_id = self.prepayment_journal
                 dict_g['journal_id'] = journal_id.id
 
@@ -3924,15 +5220,24 @@ class ResCompany(models.Model):
                 journal = journal_id[0]
                 if payment_type == 'inbound':
                     dict_g['payment_type'] = 'inbound'
-                    payment_method = self.env.ref('account.account_payment_method_manual_in')
+                    payment_method = self.env.ref(
+                        'account.account_payment_method_manual_in')
                     journal_payment_methods = journal.inbound_payment_method_line_ids
                 else:
                     dict_g['payment_type'] = 'outbound'
-                    payment_method = self.env.ref('account.account_payment_method_manual_out')
+                    payment_method = self.env.ref(
+                        'account.account_payment_method_manual_out')
                     journal_payment_methods = journal.outbound_payment_method_line_ids
 
+                if len(journal_payment_methods) > 1:
+                    journal_payment_methods = journal_payment_methods.filtered(
+                        lambda l: l.payment_method_id.code == 'manual')
+                    if not journal_payment_methods:
+                        journal_payment_methods = journal_payment_methods[0]
+
                 if payment_method:
-                    dict_g['payment_method_line_id'] = journal_payment_methods.id
+                    dict_g[
+                        'payment_method_line_id'] = journal_payment_methods.id
 
                 if payment_method not in journal_payment_methods.payment_method_id:
                     self._cr.commit()
@@ -3949,7 +5254,7 @@ class ResCompany(models.Model):
                     if len(pay.get('Allocations')) == 1:
 
                         if invoice_pay:
-                            if dict_g['date']:
+                            if dict_g.get('date'):
                                 dict_g['payment_date'] = dict_g['date']
                                 del dict_g['date']
                             register_payments = self.env['account.payment.register'].with_context(
@@ -3957,13 +5262,15 @@ class ResCompany(models.Model):
                                 active_ids=invoice_pay.id).create(dict_g)
                             payment_id = register_payments._create_payments()
                             if pay.get('PrepaymentID') and payment_id:
-                                payment_id.xero_prepayment_id = pay.get('PrepaymentID')
+                                payment_id.xero_prepayment_id = pay.get(
+                                    'PrepaymentID')
 
                             self._cr.commit()
                     if len(pay.get('Allocations')) > 1:
                         if pay.get('PrepaymentID'):
-                            dict_g['xero_prepayment_id'] = pay.get('PrepaymentID')
-                        if dict_g['communication']:
+                            dict_g['xero_prepayment_id'] = pay.get(
+                                'PrepaymentID')
+                        if dict_g.get('communication'):
                             dict_g['ref'] = dict_g['communication']
                             del dict_g['communication']
 
@@ -3985,8 +5292,9 @@ class ResCompany(models.Model):
                         # self._cr.commit()
                     if len(pay.get('Allocations')) == 0 and len(pay.get('Payments')) == 0:
                         if pay.get('PrepaymentID'):
-                            dict_g['xero_prepayment_id'] = pay.get('PrepaymentID')
-                        if dict_g['communication']:
+                            dict_g['xero_prepayment_id'] = pay.get(
+                                'PrepaymentID')
+                        if dict_g.get('communication'):
                             dict_g['ref'] = dict_g['communication']
                             del dict_g['communication']
 
@@ -3999,7 +5307,8 @@ class ResCompany(models.Model):
         """IMPORT OVERPAYMENTS(Customer payments and Vendor payments) FROM XERO TO ODOO"""
 
         if self.x_overpayments_date:
-            date_from = datetime.datetime.strptime(str(self.x_overpayments_date), '%Y-%m-%d').date()
+            date_from = datetime.datetime.strptime(
+                str(self.x_overpayments_date), '%Y-%m-%d').date()
         else:
             date_from = 0
 
@@ -4024,7 +5333,8 @@ class ResCompany(models.Model):
                                 self.create_imported_overpayments(grp)
                     success_form = self.env.ref('pragmatic_odoo_xero_connector.import_successfull_view',
                                                 False)
-                    self.x_overpayments_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    self.x_overpayments_date = datetime.datetime.today().strftime(
+                        '%Y-%m-%d')
 
                     return {
                         'name': _('Notification'),
@@ -4040,7 +5350,8 @@ class ResCompany(models.Model):
                 raise UserError('There is no any payment present in XERO.')
 
         elif data.status_code == 401:
-            raise UserError('Time Out..!!\n Please check your connection or error in application or refresh token.')
+            raise UserError(
+                'Time Out..!!\n Please check your connection or error in application or refresh token.')
 
     @api.model
     def create_imported_overpayments(self, pay):
@@ -4080,16 +5391,22 @@ class ResCompany(models.Model):
 
                                 dict_g['communication'] = invoice_pay.name
                                 # dict_g['invoice_ids'] = [(4, invoice_pay.id, None)]
-                                _logger.info('[Payment] ODOO INVOICE :: %s', invoice_pay)
+                                _logger.info(
+                                    '[Payment] ODOO INVOICE :: %s', invoice_pay)
 
                                 if invoice_pay.partner_id.parent_id:
-                                    dict_g['partner_id'] = invoice_pay.partner_id.parent_id.id
-                                    _logger.info('[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
+                                    dict_g[
+                                        'partner_id'] = invoice_pay.partner_id.parent_id.id
+                                    _logger.info(
+                                        '[Payment] if INV : CUSTOMER :child :: %s', invoice_pay.partner_id)
                                 else:
-                                    dict_g['partner_id'] = invoice_pay.partner_id.id
-                                    _logger.info('[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
+                                    dict_g[
+                                        'partner_id'] = invoice_pay.partner_id.id
+                                    _logger.info(
+                                        '[Payment] if INV : CUSTOMER :parent :: %s', invoice_pay.partner_id)
                             else:
-                                dict_g['partner_id'] = self.get_payment_contact(pay)
+                                dict_g['partner_id'] = self.get_payment_contact(
+                                    pay)
 
                             if pay.get('Type') == 'RECEIVE-OVERPAYMENT':
                                 dict_g['partner_type'] = 'customer'
@@ -4102,7 +5419,8 @@ class ResCompany(models.Model):
 
                             if 'partner_id' in dict_g:
                                 if not self.overpayment_journal:
-                                    raise UserError("Overpayment journal is not defined in the configuration.")
+                                    raise UserError(
+                                        "Overpayment journal is not defined in the configuration.")
                                 journal_id = self.overpayment_journal
                                 dict_g['journal_id'] = journal_id.id
 
@@ -4111,15 +5429,22 @@ class ResCompany(models.Model):
                                 journal = journal_id[0]
                                 if payment_type == 'inbound':
                                     dict_g['payment_type'] = 'inbound'
-                                    payment_method = self.env.ref('account.account_payment_method_manual_in')
+                                    payment_method = self.env.ref(
+                                        'account.account_payment_method_manual_in')
                                     journal_payment_methods = journal.inbound_payment_method_line_ids
                                 else:
                                     dict_g['payment_type'] = 'outbound'
-                                    payment_method = self.env.ref('account.account_payment_method_manual_out')
+                                    payment_method = self.env.ref(
+                                        'account.account_payment_method_manual_out')
                                     journal_payment_methods = journal.outbound_payment_method_line_ids
-
+                                if len(journal_payment_methods) > 1:
+                                    journal_payment_methods = journal_payment_methods.filtered(
+                                        lambda l: l.payment_method_id.code == 'manual')
+                                    if not journal_payment_methods:
+                                        journal_payment_methods = journal_payment_methods[0]
                                 if payment_method:
-                                    dict_g['payment_method_line_id'] = journal_payment_methods.id
+                                    dict_g[
+                                        'payment_method_line_id'] = journal_payment_methods.id
 
                                 if payment_method not in journal_payment_methods.payment_method_id:
                                     self._cr.commit()
@@ -4146,12 +5471,14 @@ class ResCompany(models.Model):
                             if invoice_pay:
                                 if invoice_pay.name:
                                     if communication:
-                                        communication = communication + ',' + invoice_pay.name
+                                        communication = communication + \
+                                                        ',' + invoice_pay.name
                                     else:
                                         communication = invoice_pay.name
 
                                 invoice_ids.append(invoice_pay.id)
-                                _logger.info('[Payment] ODOO INVOICE :: %s', invoice_pay)
+                                _logger.info(
+                                    '[Payment] ODOO INVOICE :: %s', invoice_pay)
 
                                 # partner_id = self.get_payment_contact(pay)
 
@@ -4176,7 +5503,8 @@ class ResCompany(models.Model):
 
                 if 'partner_id' in dict_g:
                     if not self.overpayment_journal:
-                        raise UserError("Overpayment journal is not defined in the configuration.")
+                        raise UserError(
+                            "Overpayment journal is not defined in the configuration.")
                     journal_id = self.overpayment_journal
                     dict_g['journal_id'] = journal_id.id
 
@@ -4185,13 +5513,19 @@ class ResCompany(models.Model):
                     journal = journal_id[0]
                     if payment_type == 'inbound':
                         dict_g['payment_type'] = 'inbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_in')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_in')
                         journal_payment_methods = journal.inbound_payment_method_line_ids
                     else:
                         dict_g['payment_type'] = 'outbound'
-                        payment_method = self.env.ref('account.account_payment_method_manual_out')
+                        payment_method = self.env.ref(
+                            'account.account_payment_method_manual_out')
                         journal_payment_methods = journal.outbound_payment_method_line_ids
-
+                    if len(journal_payment_methods) > 1:
+                        journal_payment_methods = journal_payment_methods.filtered(
+                            lambda l: l.payment_method_id.code == 'manual')
+                        if not journal_payment_methods:
+                            journal_payment_methods = journal_payment_methods[0]
                     if payment_method:
                         dict_g['payment_method_line_id'] = payment_method.id
 
@@ -4213,7 +5547,8 @@ class ResCompany(models.Model):
 
             if 'partner_id' in dict_g:
                 if not self.overpayment_journal:
-                    raise UserError("Overpayment journal is not defined in the configuration.")
+                    raise UserError(
+                        "Overpayment journal is not defined in the configuration.")
                 journal_id = self.overpayment_journal
                 dict_g['journal_id'] = journal_id.id
 
@@ -4222,15 +5557,23 @@ class ResCompany(models.Model):
                 journal = journal_id[0]
                 if payment_type == 'inbound':
                     dict_g['payment_type'] = 'inbound'
-                    payment_method = self.env.ref('account.account_payment_method_manual_in')
+                    payment_method = self.env.ref(
+                        'account.account_payment_method_manual_in')
                     journal_payment_methods = journal.inbound_payment_method_line_ids
                 else:
                     dict_g['payment_type'] = 'outbound'
-                    payment_method = self.env.ref('account.account_payment_method_manual_out')
+                    payment_method = self.env.ref(
+                        'account.account_payment_method_manual_out')
                     journal_payment_methods = journal.outbound_payment_method_line_ids
+                if len(journal_payment_methods) > 1:
+                    journal_payment_methods = journal_payment_methods.filtered(
+                        lambda l: l.payment_method_id.code == 'manual')
+                    if not journal_payment_methods:
+                        journal_payment_methods = journal_payment_methods[0]
 
                 if payment_method:
-                    dict_g['payment_method_line_id'] = journal_payment_methods.id
+                    dict_g[
+                        'payment_method_line_id'] = journal_payment_methods.id
 
                 if payment_method not in journal_payment_methods.payment_method_id:
                     self._cr.commit()
@@ -4246,7 +5589,7 @@ class ResCompany(models.Model):
 
                     if len(pay.get('Allocations')) == 1:
                         if invoice_pay:
-                            if dict_g['date']:
+                            if dict_g.get('date'):
                                 dict_g['payment_date'] = dict_g['date']
                                 del dict_g['date']
                             register_payments = self.env['account.payment.register'].with_context(
@@ -4254,13 +5597,15 @@ class ResCompany(models.Model):
                                 active_ids=invoice_pay.id).create(dict_g)
                             payment_id = register_payments._create_payments()
                             if pay.get('OverpaymentID') and payment_id:
-                                payment_id.xero_overpayment_id = pay.get('OverpaymentID')
+                                payment_id.xero_overpayment_id = pay.get(
+                                    'OverpaymentID')
 
                             self._cr.commit()
                     if len(pay.get('Allocations')) > 1:
                         if pay.get('OverpaymentID'):
-                            dict_g['xero_overpayment_id'] = pay.get('OverpaymentID')
-                        if dict_g['communication']:
+                            dict_g['xero_overpayment_id'] = pay.get(
+                                'OverpaymentID')
+                        if dict_g.get('communication'):
                             dict_g['ref'] = dict_g['communication']
                             del dict_g['communication']
                         pay_create = acc_pay.create(dict_g)
@@ -4280,8 +5625,9 @@ class ResCompany(models.Model):
                         # self._cr.commit()
                     if len(pay.get('Allocations')) == 0 and len(pay.get('Payments')) == 0:
                         if pay.get('OverpaymentID'):
-                            dict_g['xero_overpayment_id'] = pay.get('OverpaymentID')
-                        if dict_g['communication']:
+                            dict_g['xero_overpayment_id'] = pay.get(
+                                'OverpaymentID')
+                        if dict_g.get('communication'):
                             dict_g['ref'] = dict_g['communication']
                             del dict_g['communication']
                         pay_create = acc_pay.create(dict_g)
@@ -4301,10 +5647,12 @@ class ResCompany(models.Model):
                 if customer_id:
                     if customer_id.parent_id:
                         partner_id = customer_id.parent_id.id
-                        _logger.info('[Payment] existing CUSTOMER :parent :: %s', customer_id)
+                        _logger.info(
+                            '[Payment] existing CUSTOMER :parent :: %s', customer_id)
                     else:
                         partner_id = customer_id.id
-                        _logger.info('[Payment] existing CUSTOMER :child :: %s', customer_id)
+                        _logger.info(
+                            '[Payment] existing CUSTOMER :child :: %s', customer_id)
                 else:
                     self.fetch_the_required_customer(
                         pay.get('Contact').get('ContactID'))
@@ -4315,30 +5663,36 @@ class ResCompany(models.Model):
                     if res_partner:
                         if res_partner.parent_id:
                             partner_id = res_partner.parent_id.id
-                            _logger.info('[Payment] CUSTOMER :parent :: %s', res_partner)
+                            _logger.info(
+                                '[Payment] CUSTOMER :parent :: %s', res_partner)
                         else:
                             partner_id = res_partner.id
-                            _logger.info('[Payment] CUSTOMER :child :: %s', res_partner)
+                            _logger.info(
+                                '[Payment] CUSTOMER :child :: %s', res_partner)
         return partner_id
 
     @api.model
     def import_payments_cron(self):
-        company = self.env['res.users'].search([('id', '=', self._uid)]).company_id
+        company = self.env['res.users'].search(
+            [('id', '=', self._uid)]).company_id
         company.import_payments()
 
     @api.model
     def import_invoice_cron(self):
-        company = self.env['res.users'].search([('id', '=', self._uid)]).company_id
+        company = self.env['res.users'].search(
+            [('id', '=', self._uid)]).company_id
         company.import_invoice()
 
     @api.model
     def import_manual_journal_cron(self):
-        company = self.env['res.users'].search([('id', '=', self._uid)]).company_id
+        company = self.env['res.users'].search(
+            [('id', '=', self._uid)]).company_id
         company.import_manual_journals()
 
     @api.model
     def import_purchase_order_cron(self):
-        company = self.env['res.users'].search([('id', '=', self._uid)]).company_id
+        company = self.env['res.users'].search(
+            [('id', '=', self._uid)]).company_id
         company.import_purchase_order()
 
 
@@ -4348,8 +5702,10 @@ class AccountJournal(models.Model):
     def get_journal_from_account(self, xero_account_code):
         res_id_user = self.env['res.company'].search([])
 
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        _logger.info('\n\nXero Account code for Find Journal: \n\n{}\n\n'.format(xero_account_code))
+        xero_config = self.env['res.users'].search(
+            [('id', '=', self._uid)], limit=1).company_id
+        _logger.info(
+            '\n\nXero Acount code for Find Journal : \n\n{}\n\n'.format(xero_account_code))
         account_id = self.env['account.account'].search(
             [('code', '=', xero_account_code), ('company_id', '=', xero_config.id)])
         account = self.env['account.account'].browse(account_id)
@@ -4358,4 +5714,7 @@ class AccountJournal(models.Model):
                                   ('company_id', '=', xero_config.id)],
                                  limit=1)
 
+        if not journal_id:
+            raise ValidationError(
+                _("Payment journal is not defined for XERO's Account : %s " % (xero_account_code)))
         return journal_id

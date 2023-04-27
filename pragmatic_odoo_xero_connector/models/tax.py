@@ -22,14 +22,11 @@ class Tax(models.Model):
 
     @api.model
     def get_xero_tax_ref(self, tax):
-        # print("TAX ID : ",tax)
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
 
         if tax.xero_tax_type_id:
-            # print("TAX TYPE : -------------> ",tax.xero_tax_type_id)
             return tax
         else:
-            # print("im here")
             self.create_main_tax_in_xero(tax,xero_config)
             if tax.xero_tax_type_id:
                 return tax
@@ -55,7 +52,6 @@ class Tax(models.Model):
         company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
 
         if self.name:
-            # print("name : ",self.name)
             if self.CanApplyToEquity:
                 if self.CanApplyToEquity == True:
                         ApplyToEquity = 'true'
@@ -75,7 +71,6 @@ class Tax(models.Model):
                         ApplyToRevenue = 'false'
 
             if self.CanApplyToExpenses:
-                # print("\nCanApplyToExpenses --------------> ",self.CanApplyToExpenses)
                 if self.CanApplyToExpenses == True:
                         ApplyToExpenses = 'true'
                 else:
@@ -102,7 +97,6 @@ class Tax(models.Model):
                         "IsNonRecoverable": "false"
                     }
                     component_list.append(component_dict)
-            # print("TAX LIST : ",component_list)
 
             if self.amount_type:
                 if self.amount_type == 'percent':
@@ -124,7 +118,6 @@ class Tax(models.Model):
                         "CanApplyToAssets": ApplyToAssets,
                     })
                 elif self.amount_type == 'group':
-                    # print("---------------> ",self.amount_type)
                     vals.update({
                         "Name": self.name,
                         "TaxComponents": component_list,
@@ -134,7 +127,6 @@ class Tax(models.Model):
                         "CanApplyToExpenses": ApplyToExpenses,
                         "CanApplyToAssets": ApplyToAssets,
                     })
-        # print("VALS : ",vals)
         return vals
 
     @api.model
@@ -180,7 +172,6 @@ class Tax(models.Model):
     def create_main_tax_in_xero(self,t,xero_config):
 
         vals = t.prepare_tax_export_dict()
-        # print("--------------> ",vals)
         if (xero_config.xero_country_name == 'United Kingdom') or (xero_config.xero_country_name == 'New Zealand') or (xero_config.xero_country_name == 'Australia'):
             # if not self.xero_tax_type_id:
                     if t.xero_record_taxtype:
@@ -195,9 +186,7 @@ class Tax(models.Model):
                             "ReportTaxType": t.xero_record_taxtype
                         })
                     else:
-                        # print("\nGGGGGGGGGGGGGGGGGG",t.type_tax_use)
                         if t.type_tax_use:
-                            # print("----------------")
                             if t.type_tax_use == 'sale':
                                 vals.update({
                                     "ReportTaxType": 'OUTPUT'
@@ -208,7 +197,6 @@ class Tax(models.Model):
                                 })
 
         parsed_dict = json.dumps(vals)
-        # print("\n\n--------------> ",parsed_dict)
 
         if xero_config.xero_oauth_token:
             token = xero_config.xero_oauth_token
@@ -225,7 +213,6 @@ class Tax(models.Model):
 
             data = requests.request('POST', url=protected_url, data=parsed_dict, headers=headers)
 
-            # print("DATA : ",data,data.text)
             if data.status_code == 200:
 
                 response_data = json.loads(data.text)

@@ -52,6 +52,7 @@
 								</group>
 								<group>
 									<field name="x_purchaseorder_date" />
+									<field name="xero_last_imported_po_page" />
 								</group>
 							</group>
 							<group>
@@ -60,6 +61,7 @@
 								</group>
 								<group>
 									<field name="x_invoice_date" />
+									<field name="xero_last_imported_invoice_page" />
 								</group>
 							</group>
 							<group>
@@ -68,6 +70,7 @@
 								</group>
 								<group>
 									<field name="x_credit_note_date" />
+									<field name="xero_last_imported_credit_note_page" />
 								</group>
 							</group>
 							<group>
@@ -100,6 +103,7 @@
 								</group>
 								<group>
 									<field name="x_salesorder_date" />
+									<field name="xero_last_imported_so_page" />
 								</group>
 							</group>
 							<group>
@@ -108,8 +112,46 @@
 								</group>
 								<group>
 									<field name="x_journal_date" />
+									<field name="xero_last_imported_manual_journal_page" />
 								</group>
 							</group>
+
+							<group>
+								<group>
+									<button string="14-Import Spend/Receive Money" type="object" name="import_spnd_mny" class="oe_highlight" icon="fa-arrow-circle-down"/>
+								</group>
+								<group>
+<!--									<field name="spend_money_date" />-->
+									<field name="xero_last_imported_spnd_mny_page" string="Last Import Page Spend/Receive"/>
+								</group>
+							</group>
+
+							<group>
+								<group>
+									<button string="14-Import All (Spend/Receive) Money" type="object" name="spnd_rcv_main_function_all" class="oe_highlight" icon="fa-arrow-circle-down"/>
+								</group>
+							</group>
+
+							<group>
+								<group>
+									<button string="Import Failed (Spend/Receive) Money" type="object" name="spnd_rcv_main_function_failed" class="oe_highlight" icon="fa-arrow-circle-down"/>
+								</group>
+								<group>
+									<button string="View Failed (Spend/Receive) Money" type="object" name="view_spnd_rcv_main_function_failed" class="oe_highlight" icon="fa-arrow-circle-down"/>
+								</group>
+							</group>
+
+<!-- 						<group>
+								<group>
+									<button string="15-Importing Receive Money" type="object" name="import_rcv_mny" class="oe_highlight" icon="fa-arrow-circle-down"/>
+								</group>
+								<group>
+									<field name="receive_money_date" />
+									<field name="xero_last_imported_rcv_mny_page" />
+								</group>
+							</group> -->
+
+
 					</page>
 
 					<page name="export_invoices_bills_configuration" string='Export'>
@@ -121,6 +163,7 @@
 							<field name="invoice_status"/>
 							<field name="export_record_after" />
 							<field name="map_invoice_reference" />
+							<field name="skip_jnrl_entry" />
 						</group>
 					</page>
 
@@ -137,6 +180,9 @@
 							<field name="overpayment_journal"/>
 							<field name="prepayment_journal" />
 							<field name="manual_journal" />
+							<field name="default_prod_po" />
+							<field name="default_prod_so" />
+							<field name="set_accoung_tag" />
 
 						</group>
 						<group name="Url">
