@@ -89,11 +89,11 @@ class CustomerPortalEx(CustomerPortal):
         format_right = workbook.add_format({'valign': 'vcenter', 'bold': True, 'align': 'right'})
         format_center = workbook.add_format({'valign': 'vcenter', 'bold': False, 'align': 'center'})
         table_row = 5
-        for i in range(7):
+        for i in range(6):
             worksheet.set_column(0, i, 20)
         if values_to_render.get("pricelist_products"):
-            worksheet.merge_range(0, 0, 1, 6, "Product Pricelist", head_format_center)
-            worksheet.write(2, 6, "Date: " + values_to_render["current_date"], head_format_left)
+            worksheet.merge_range(0, 0, 1, 5, "Product Pricelist", head_format_center)
+            worksheet.write(2, 5, "Date: " + values_to_render["current_date"], head_format_left)
 
             if values_to_render.get("e_com_categ"):
                 worksheet.write(2, 0, "Product Category: " + values_to_render["e_com_categ"].name, head_format_left)
@@ -106,7 +106,7 @@ class CustomerPortalEx(CustomerPortal):
             worksheet.write('D5', 'Min. Quantity', head_format)
             worksheet.write('E5', 'Price Duration', head_format)
             worksheet.write('F5', 'Price', head_format)
-            worksheet.write('G5', 'On Hand Qty.', head_format)
+            # worksheet.write('G5', 'On Hand Qty.', head_format)
 
             for pricelist_product in values_to_render.get("pricelist_products"):
                 worksheet.write(table_row, 0, pricelist_product['product_id'].default_code or "")
@@ -118,17 +118,17 @@ class CustomerPortalEx(CustomerPortal):
                 worksheet.write(table_row, 5, self.format_currency_amount(pricelist_product['price'],
                                                                           values_to_render.get("currency_id")),
                                 format_right)
-                if pricelist_product['show_product_stock']:
-                    worksheet.write(table_row, 6, pricelist_product['stock_on_hand'], format_center)
-                else:
-                    if pricelist_product['stock_on_hand'] > 0:
-                        worksheet.write(table_row, 6, "In Stock", format_center)
-                    else:
-                        worksheet.write(table_row, 6, "Out Of Stock", format_center)
+                # if pricelist_product['show_product_stock']:
+                #     worksheet.write(table_row, 6, pricelist_product['stock_on_hand'], format_center)
+                # else:
+                #     if pricelist_product['stock_on_hand'] > 0:
+                #         worksheet.write(table_row, 6, "In Stock", format_center)
+                #     else:
+                #         worksheet.write(table_row, 6, "Out Of Stock", format_center)
 
                 table_row += 1
         else:
-            worksheet.merge_range(0, 0, 1, 6, "You do not have any products in the pricelist!", head_format_left)
+            worksheet.merge_range(0, 0, 1, 5, "You do not have any products in the pricelist!", head_format_left)
         workbook.close()
         target_stream.seek(0)
         output = base64.encodebytes(target_stream.read())
