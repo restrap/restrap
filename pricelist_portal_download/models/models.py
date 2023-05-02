@@ -8,12 +8,12 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     allow_pricelist_download = fields.Boolean("Portal Pricelist Download")
-    show_product_stock = fields.Boolean()
+    # show_product_stock = fields.Boolean()
 
-    @api.onchange("allow_pricelist_download")
-    def allow_pricelist_download_change(self):
-        if not self.allow_pricelist_download:
-            self.show_product_stock = False
+    # @api.onchange("allow_pricelist_download")
+    # def allow_pricelist_download_change(self):
+    #     if not self.allow_pricelist_download:
+    #         self.show_product_stock = False
 
     def get_pricelist_rules(self, ecom_category=None):
         pricelist_id = self.property_product_pricelist
@@ -112,17 +112,17 @@ class ResPartner(models.Model):
             else:
                 cur = product_id.currency_id
             price = cur._convert(price, pricelist_id.currency_id, self.env.company, date, round=False)
-        website = self.env['website'].get_current_website()
-        qty = product_id.with_context(warehouse=website._get_warehouse_available()).free_qty
-        if qty < 0:
-            qty = 0
+        # website = self.env['website'].get_current_website()
+        # qty = product_id.with_context(warehouse=website._get_warehouse_available()).free_qty
+        # if qty < 0:
+        #     qty = 0
         return {
             "product_id": product_id,
             "min_qty": min_quantity,
             "price_duration": price_duration,
             "price": price,
-            "show_product_stock": self.show_product_stock,
-            "stock_on_hand": qty
+            # "show_product_stock": self.show_product_stock,
+            # "stock_on_hand": qty
         }
 
 
