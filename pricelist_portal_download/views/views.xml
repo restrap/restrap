@@ -8,7 +8,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='property_product_pricelist']" position="after">
                     <field name="allow_pricelist_download" />
-                    <field name="show_product_stock" attrs="{'invisible': [('allow_pricelist_download', '=', False)]}"/>
+<!--                    <field name="show_product_stock" attrs="{'invisible': [('allow_pricelist_download', '=', False)]}"/>-->
                 </xpath>
             </field>
         </record>

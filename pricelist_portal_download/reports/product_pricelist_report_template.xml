@@ -26,7 +26,7 @@
                                     <th class="text-center">Min. Quantity</th>
                                     <th class="text-center">Price Duration</th>
                                     <th class="text-right">Price</th>
-                                    <th class="text-center">On Hand Qty.</th>
+<!--                                    <th class="text-center">On Hand Qty.</th>-->
                                 </tr>
                             </thead>
                             <tbody>
@@ -55,21 +55,21 @@
                                             <t t-esc="pricelist_product['price']"
                                                t-options='{"widget": "monetary", "display_currency": currency_id}'/>
                                         </td>
-                                        <td class="text-center">
-                                            <t t-if="pricelist_product['show_product_stock']">
-                                                 <t t-esc="pricelist_product['stock_on_hand']"
-                                               t-options='{"widget": "float", "decimal_precision": "Product Unit of Measure"}'/>
-                                            </t>
-                                            <t t-else="">
-                                                <t t-if="pricelist_product['stock_on_hand'] > 0">
-                                                    In Stock
-                                                </t>
-                                                <t t-else="">
-                                                    Out Of Stock
-                                                </t>
-                                            </t>
+<!--                                        <td class="text-center">-->
+<!--                                            <t t-if="pricelist_product['show_product_stock']">-->
+<!--                                                 <t t-esc="pricelist_product['stock_on_hand']"-->
+<!--                                               t-options='{"widget": "float", "decimal_precision": "Product Unit of Measure"}'/>-->
+<!--                                            </t>-->
+<!--                                            <t t-else="">-->
+<!--                                                <t t-if="pricelist_product['stock_on_hand'] > 0">-->
+<!--                                                    In Stock-->
+<!--                                                </t>-->
+<!--                                                <t t-else="">-->
+<!--                                                    Out Of Stock-->
+<!--                                                </t>-->
+<!--                                            </t>-->
 
-                                        </td>
+<!--                                        </td>-->
                                     </tr>
                                 </t>
                             </tbody>

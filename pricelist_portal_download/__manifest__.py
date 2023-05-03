@@ -17,7 +17,7 @@
 
     'author': 'Azkob',
     'category': 'Website',
-    'version': '1.0',
+    'version': '1.1',
 
     # any module necessary for this one to work correctly
     'depends': ['website_sale_stock'],
@@ -29,14 +29,11 @@
         'reports/product_pricelist_report_template.xml',
     ],
     # only loaded in demonstration mode
-    'images': [
-        'static/description/banner.jpg',
-    ],
     'demo': [
     ],
     'installable': True,
     'application': True,
     'price': 55,
-    'currency': 'EUR',
+    'currency': 'USD',
     'live_test_url': "https://youtu.be/eMXeZWETqlM",
 }
