@@ -17,41 +17,28 @@
                 <th name="th_item_weight" class="text-center"><strong>Item Weight</strong></th>
             </xpath>
 
-            <xpath expr="//t[@t-set='address']" position="replace">
-                <t t-if="o.picking_type_id.code != 'outgoing'" t-set="address" >
-                    <div name="div_outgoing_address">
-                        <div t-if="o.should_print_delivery_address()">
-                            <span><strong>Delivery Address:</strong></span>
-                            <div t-field="o.move_lines[0].partner_id"
-                                t-options='{"widget": "contact", "fields": ["address", "name", "phone"], "no_marker": True, "phone_icons": True}'/>
-                        </div>
-                        <div t-if="o.picking_type_id.code != 'internal' and o.picking_type_id.warehouse_id.partner_id">
-                            <span><strong>Warehouse Address:</strong></span>
-                            <div t-field="o.picking_type_id.warehouse_id.partner_id"
-                                t-options='{"widget": "contact", "fields": ["address", "name", "phone"], "no_marker": True, "phone_icons": True}'/>
-                        </div>
+            <xpath expr="//div[@name='div_outgoing_address']" position="replace">
+                <div t-if="o.picking_type_code != 'outgoing'" class="col-6" name="div_outgoing_address">
+                    <div t-if="o.move_ids_without_package and o.move_ids_without_package[0].partner_id and o.move_ids_without_package[0].partner_id.id != o.partner_id.id">
+                        <span><strong>Delivery Address:</strong></span>
+                        <div t-field="o.move_ids_without_package[0].partner_id" t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;, &quot;phone&quot;], &quot;no_marker&quot;: True, &quot;phone_icons&quot;: True}"/>
                     </div>
-                </t>
+                    <div t-if="o.picking_type_id.code != 'internal' and (not o.move_ids_without_package or not o.move_ids_without_package[0].partner_id) and o.picking_type_id.warehouse_id.partner_id">
+                        <span><strong>Warehouse Address:</strong></span>
+                        <div t-field="o.picking_type_id.warehouse_id.partner_id" t-options="{&quot;widget&quot;: &quot;contact&quot;, &quot;fields&quot;: [&quot;address&quot;, &quot;name&quot;, &quot;phone&quot;], &quot;no_marker&quot;: True, &quot;phone_icons&quot;: True}"/>
+                    </div>
+                </div>
             </xpath>
 
-            <xpath expr="//t[@t-set='information_block']" position="replace">
-                <t t-set="information_block">
-                    <div class="row">
-                        <div class="col-7" name="div_incoming_address">
-                            <div t-if="o.picking_type_id.code=='incoming' and partner">
-                                <span><strong>Vendor Address:</strong></span>
-                            </div>
-                            <div t-if="o.picking_type_id.code=='internal' and partner">
-                                <span><strong>Warehouse Address:</strong></span>
-                            </div>
-                            <div t-if="partner and not o.picking_type_id.code=='outgoing'" name="partner_header">
-                                <div t-field="partner.commercial_partner_id"
-                                    t-options='{"widget": "contact", "fields": ["address", "name", "phone"], "no_marker": True, "phone_icons": True}'/>
-                                <p t-if="partner.sudo().commercial_partner_id.vat"><t t-esc="o.company_id.country_id.vat_label or 'Tax ID'"/>: <span t-field="partner.sudo().commercial_partner_id.vat"/></p>
-                            </div>
-                        </div>
-                    </div>
-                </t>
+            <xpath expr="//div[@name='div_incoming_address']/div[3]" position="replace">
+            </xpath>
+
+            <xpath expr="//div[@name='partner_header']" position="replace">
+                <div t-if="partner and not o.picking_type_id.code=='outgoing'" name="partner_header">
+                    <div t-field="partner.commercial_partner_id"
+                        t-options='{"widget": "contact", "fields": ["address", "name", "phone"], "no_marker": True, "phone_icons": True}'/>
+                    <p t-if="partner.sudo().commercial_partner_id.vat"><t t-esc="o.company_id.country_id.vat_label or 'Tax ID'"/>: <span t-field="partner.sudo().commercial_partner_id.vat"/></p>
+                </div>
             </xpath>
 
             <xpath expr="//table[@name='stock_move_line_table']" position="attributes">
