@@ -14,7 +14,7 @@
                 <attribute name="t-if">o._name != 'stock.picking' or o._name == 'stock.picking' and o.picking_type_code != 'outgoing'</attribute>
             </xpath>
             <xpath expr="//div[@name='company_address']" position="after">
-                <div t-if="o.partner_id and o._name == 'stock.picking' and o.picking_type_code == 'outgoing'" class="col-6" style="font-size:12px;">
+                <div t-if="o.partner_id and o._name == 'stock.picking' and o.picking_type_code == 'outgoing' and delivery_slip_report" class="col-6" style="font-size:12px;">
                   <strong>Customer Name:</strong>
                   <p t-field="o.partner_id.name"/>
                 </div>
@@ -33,10 +33,7 @@
                 </div>
             </xpath>
             <xpath expr="//ul[@class='list-inline mb4']" position="replace">
-                 <ul t-if="o._name != 'stock.picking'" class="list-inline mb4">
-                    <div t-field="company.report_footer"/>
-                </ul>
-                <ul t-if="o._name == 'stock.picking' and 'picking_type_code' in o and o.picking_type_code != 'outgoing'" class="list-inline mb4">
+                 <ul t-if="not delivery_slip_report" class="list-inline mb4">
                     <div t-field="company.report_footer"/>
                 </ul>
             </xpath>

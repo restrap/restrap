@@ -2,19 +2,31 @@
 <odoo>
     <data>
         <template id="report_delivery_document_restrap_inherit" inherit_id="stock.report_delivery_document">
+            <xpath expr="//t[@t-call='web.external_layout']" position="before">
+                <t t-set="delivery_slip_report" t-value="True"/>
+            </xpath>
             <xpath expr="//table[@name='stock_move_table']//th[@name='th_sm_quantity']" position="before">
                 <th name="th_sum_weight"><strong>Sum of Weight</strong></th>
                 <th name="th_item_weight"><strong>Item Weight</strong></th>
             </xpath>
 
+            <xpath expr="//table[@name='stock_move_table']//th[@name='th_sm_quantity']" position="after">
+                <th name="th_origin"><strong>Origin</strong></th>
+            </xpath>
+
             <xpath expr="//table[@name='stock_move_table']//span[@t-field='move.quantity_done']/parent::td" position="before">
-                <td><span t-esc="move.quantity_done * move.product_id.weight"/></td>
-                <td><span t-esc="move.product_id.weight"/></td>
+                <td><span t-esc="move.quantity_done * move.product_id.weight" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/></td>
+                <td t-if="move.product_id.weight"><span t-esc="move.product_id.weight" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/></td>
+                <td t-else=""><span>0</span></td>
             </xpath>
 
             <xpath expr="//table[@name='stock_move_line_table']//th[@name='th_sml_quantity']" position="before">
                 <th name="th_sum_weight" class="text-center"><strong>Sum of Weight</strong></th>
                 <th name="th_item_weight" class="text-center"><strong>Item Weight</strong></th>
+            </xpath>
+
+            <xpath expr="//table[@name='stock_move_line_table']//th[@name='th_sml_quantity']" position="after">
+                <th name="th_origin"><strong>Origin</strong></th>
             </xpath>
 
             <xpath expr="//div[@name='div_outgoing_address']" position="replace">
@@ -167,9 +179,7 @@
                     <span t-field="o.weight_uom_name"/>
                 </div>
             </xpath>
-            <xpath expr="//th[@t-if='has_hs_code']" position="after">
-                <th><strong>Origin</strong></th>
-            </xpath>
+
             <xpath expr="//div[@class='row mt32 mb32']" position="replace">
                 <div t-if="not o.has_packages" class="row mt32 mb32">
                     <div t-if="o.origin" class="col-auto" name="div_origin">
@@ -195,10 +205,11 @@
                     <span t-esc="aggregated_lines[line]['qty_done'] * aggregated_lines[line]['product']['weight']"
                     t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/>
                 </td>
-                <td class="text-center">
+                <td t-if="aggregated_lines[line]['product']['weight']" class="text-center">
                     <span t-esc="aggregated_lines[line]['product']['weight']"
                     t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/>
                 </td>
+                <td t-else=""><span>0</span></td>
             </xpath>
         </template>
 
