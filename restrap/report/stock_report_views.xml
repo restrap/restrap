@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="delivery_slip_paperformat" model="report.paperformat">
+            <field name="name">Delivery Slip 101.6mm x 152.4mm</field>
+            <field name="default" eval="True" />
+            <field name="format">custom</field>
+            <field name="page_height">152</field>
+            <field name="page_width">101</field>
+            <field name="margin_top">22</field>
+            <field name="margin_bottom">10</field>
+            <field name="header_spacing">20</field>
+            <field name="orientation">Portrait</field>
+            <field name="disable_shrinking" eval="False"/>
+        </record>
+
+        <record id="stock.action_report_delivery" model="ir.actions.report">
+            <field name="paperformat_id" ref="delivery_slip_paperformat"/>
+        </record>
+
+    </data>
+</odoo>
