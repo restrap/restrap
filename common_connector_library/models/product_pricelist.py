@@ -26,12 +26,12 @@ class ProductPricelist(models.Model):
             Task_id: 178058
         """
         pricelist_item_obj = self.env['product.pricelist.item']
-        domain = [('pricelist_id', '=', self.id), ('product_id', '=', product_id)]
+        domain = [('pricelist_id', '=', self.id), ('product_id', '=', product_id), ('min_quantity', '=', min_qty)]
 
         pricelist_item = pricelist_item_obj.search(domain)
 
         if pricelist_item:
-            pricelist_item.write({'fixed_price': price, 'min_quantity': min_qty})
+            pricelist_item.write({'fixed_price': price})
         else:
             vals = self.prepre_pricelistitem_vals(product_id, min_qty, price)
             new_record = pricelist_item_obj.new(vals)
@@ -55,3 +55,10 @@ class ProductPricelist(models.Model):
             'fixed_price': price,
         }
         return vals
+
+    def get_product_price_list_rule(self, product, quantity, partner):
+        """ add method for a get price and rule base on given pricelist and product
+            added by : Nilam Kubavat at 21st April 2023
+        """
+        rule = self.get_product_price_rule(product, quantity, partner, date=False, uom_id=product.uom_id.id)
+        return rule
