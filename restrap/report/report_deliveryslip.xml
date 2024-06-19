@@ -44,8 +44,8 @@
                 </div>
             </xpath>
 
-            <xpath expr="//div[@name='div_incoming_address']/div[3]" position="replace">
-            </xpath>
+            <!-- <xpath expr="//div[@name='div_incoming_address']/div[3]" position="replace">
+            </xpath> -->
 
             <xpath expr="//div[@name='partner_header']" position="replace">
                 <div t-if="partner and not o.picking_type_id.code=='outgoing'" name="partner_header">
