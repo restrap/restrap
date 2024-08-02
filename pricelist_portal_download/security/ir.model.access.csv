@@ -1,2 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pricelist_portal_download_pricelist_portal_download,pricelist_portal_download.pricelist_portal_download,model_pricelist_portal_download_pricelist_portal_download,base.group_user,1,1,1,1
