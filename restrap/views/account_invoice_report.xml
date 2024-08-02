@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <template id="report_invoice_document" inherit_id="account.report_invoice_document" name="report_invoice_document_restrap">
+
+        <xpath expr="//table[@name='invoice_line_table']/thead/tr/th[1]" position="after">
+            <t t-if="o.move_type == 'out_invoice'">
+                <th name="th_origin">Origin</th>
+                <th name="th_hscode">HS Code</th>
+            </t>
+        </xpath>
+        <xpath expr="//table[@name='invoice_line_table']/tbody/t[4]/tr/t/td[1]" position="after">
+            <t t-if="o.move_type == 'out_invoice'">
+                <td name="td_hscode"><span t-field="line.product_id.origin_country_id.code"/></td>
+                <td name="td_hscode"><span t-field="line.product_id.hs_code"/></td>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="document_tax_totals_invoice" inherit_id="account.document_tax_totals" name="document_tax_totals_restrap_invoice">
+        <xpath expr="//t[@t-as='subtotal']" position="before">
+            <tr t-if="o and o._name == 'account.move' and o.move_type == 'out_invoice'" class="border-black o_total">
+                <td><strong>Total Units</strong></td>
+                <td class="text-right">
+                    <span t-field="o.total_qty"/>
+                </td>
+            </tr>
+        </xpath>
+    </template>
+
+</odoo>
