@@ -26,7 +26,7 @@
             <xpath expr="//table[@name='stock_move_table']//span[@t-field='move.product_uom_qty']/parent::td"
                    position="before">
                 <td>
-                    <span t-esc="move.quantity_done * move.product_id.weight"
+                    <span t-esc="move.quantity * move.product_id.weight"
                           t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/>
                 </td>
                 <td t-if="move.product_id.weight">
@@ -260,7 +260,10 @@
                 </div>
                 <t t-set="has_hs_code" t-value="o.move_ids.filtered(lambda l: l.product_id.hs_code)"/>
             </xpath>
-            <xpath expr="//th[@t-if='has_hs_code']" position="after">
+
+
+
+            <xpath expr="//table[@name='stock_move_line_table']/thead/tr/th[@t-if='has_hs_code']" position="after">
                 <th name="th_origin">
                     <strong>Origin</strong>
                 </th>

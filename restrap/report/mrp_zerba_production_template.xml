@@ -12,10 +12,10 @@
                 <t t-foreach="range(qty)" t-as="item">
                     <t t-translation="off">
 ^XA
-^FO250,50
+^FO120,50
 ^A0N,35,20^FD<t t-esc="production.product_id.default_code"/>^FS
 
-^FO250,100^BY2
+^FO120,100^BY2
 ^BCN,100,Y,N,N
 ^FD<t t-esc="production.product_id.barcode"/>^FS
 ^XZ
