@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Restrap Module",
-    "version": "17.0.1.2",
+    "version": "17.0.1.3",
     "author": "Smart IT Ltd",
     "category": "Other",
     "summary": "Restrap Smart IT Developments",
