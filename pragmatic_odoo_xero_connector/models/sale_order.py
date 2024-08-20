@@ -23,28 +23,27 @@ class SaleOrder(models.Model):
                 line.write({"inclusive": True})
             elif self.tax_state == 'exclusive':
                 line.write({'inclusive': False})
-        # print("_______________________________________",self.inclusive,self.tax_state)
 
-    def write(self, vals):
-        super(SaleOrder, self).write(vals)
-        id = self.invoice_ids.ids
-        # print("Initial", id)
-        if id and not 1 in id:
-            id.append(1)
-            self.write_ids(id)
-        return
+    # def write(self, vals):
+    #     super(SaleOrder, self).write(vals)
+    #     id = self.invoice_ids.ids
+    #     if id and not 1 in id:
+    #         id.append(1)
+    #         self.write_ids(id)
+    #     return
 
     def write_ids(self, id):
-        # print("Before Right", id)
         self.write({
             'invoice_ids': [(6, 0, id)]
         })
         id = self.invoice_ids.ids
-        # print("After Write", id)
         return
 
     def get_head(self):
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        if self._context.get('not_cron') or self._context.get('cron'):
+            xero_config = self.company_id
+        else:
+            xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         # client_id = xero_config.xero_client_id
         # client_secret = xero_config.xero_client_secret
 
@@ -61,18 +60,26 @@ class SaleOrder(models.Model):
 
     def exportSaleOrder_cron(self):
         """export Quotations cron ODOO to XERO"""
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        valid_quotations = self.search([('date_order', '>', xero_config.export_record_after)])
-        if valid_quotations:
-            for quotation in valid_quotations:
-                if not quotation.xero_sale_id:
-                    _logger.info('Creating quotation through cron__________{}'.format(quotation.name))
-                    self.create_quotation_main(quotation, xero_config, update=False, cron=True)
+        companys = self.env['res.company'].search([])
+        self._context['cron'] = 1
+        for xero_config in companys:
+            if xero_config.xero_client_id and xero_config.xero_client_secret:
+                xero_config.refresh_token()
+                valid_quotations = self.search(
+                    [('date_order', '>', xero_config.export_record_after), ('company_id', '=', xero_config.id),
+                     ('state', '=', 'sale')])
+                if valid_quotations:
+                    for quotation in valid_quotations:
+                        if not quotation.xero_sale_id:
+                            _logger.info('Creating quotation through cron__________{}'.format(quotation.name))
+                            self.create_quotation_main(quotation, xero_config, update=False, cron=True)
+                        else:
+                            _logger.info('Updating quotation through cron__________{}'.format(quotation.name))
+                            self.create_quotation_main(quotation, xero_config, update=True, cron=True)
                 else:
-                    _logger.info('Updating quotation through cron__________{}'.format(quotation.name))
-                    self.create_quotation_main(quotation, xero_config, update=True, cron=True)
-        else:
-            _logger.warning('\n\nNo record found for date {}'.format(xero_config.export_record_after))
+                    _logger.warning('\n\nNo record found for date {}'.format(xero_config.export_record_after))
+            else:
+                continue
 
     def create_quotation_in_xero(self):
 
@@ -118,6 +125,8 @@ class SaleOrder(models.Model):
         token = None
         if xero_config.xero_oauth_token:
             token = xero_config.xero_oauth_token
+        if quot:
+            self = quot
         headers = self.get_head()
         if token:
             protected_url = 'https://api.xero.com/api.xro/2.0/Quotes'
@@ -129,9 +138,11 @@ class SaleOrder(models.Model):
                     if response_data.get('Quotes')[0].get('QuoteID'):
                         quot.update({'xero_sale_id': response_data.get('Quotes')[0].get('QuoteID')})
                         if update:
-                            _logger.info("Quotation '{}' Updated successfully".format(response_data.get('Quotes')[0].get('QuoteNumber')))
+                            _logger.info("Quotation '{}' Updated successfully".format(
+                                response_data.get('Quotes')[0].get('QuoteNumber')))
                         else:
-                            _logger.info("Quotation '{}' exported successfully".format(response_data.get('Quotes')[0].get('QuoteNumber')))
+                            _logger.info("Quotation '{}' exported successfully".format(
+                                response_data.get('Quotes')[0].get('QuoteNumber')))
 
             elif data.status_code == 400:
                 response_data = json.loads(data.text)
@@ -152,9 +163,11 @@ class SaleOrder(models.Model):
 
             elif data.status_code == 401:
                 if cron:
-                    _logger.warning('Time Out.\nPlease Check Your Connection or error in application or refresh token..!!')
+                    _logger.warning(
+                        'Time Out.\nPlease Check Your Connection or error in application or refresh token..!!')
                 else:
-                    raise ValidationError("Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
+                    raise ValidationError(
+                        "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
 
     def prepare_export_dict_for_quotation(self, update=False):
         #########################################################################
@@ -285,6 +298,10 @@ class SaleOrder(models.Model):
             'TotalTax': self.amount_tax,
             'Total': self.amount_total
         })
+
+        currency = self.currency_id if self.currency_id else False
+        if currency:
+            dict.update({"CurrencyCode": currency.name})
 
         return dict
 

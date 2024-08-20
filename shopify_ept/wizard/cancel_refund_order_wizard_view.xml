@@ -15,8 +15,7 @@
                         <field name="auto_create_credit_note"/>
                     </group>
                 </group>
-                <group string="Refund Info"
-                       attrs="{'invisible':[('auto_create_credit_note','=',False)]}">
+                <group string="Refund Info" invisible="not auto_create_credit_note">
                     <group>
                         <field name="reason"/>
                         <field name="refund_date"/>

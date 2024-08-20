@@ -15,15 +15,6 @@ class PurchaseOrder(models.Model):
     tax_state = fields.Selection([('inclusive', 'Tax Inclusive'), ('exclusive', 'Tax Exclusive'), ('no_tax', 'No Tax')],
                                  string='Tax Status', default='exclusive')
 
-    @api.depends('order_line.invoice_lines.move_id')
-    def _compute_invoice(self):
-        for order in self:
-            invoices = order.mapped('order_line.invoice_lines.move_id')
-            bills = self.env['account.move'].search([('xero_invoice_number', '=', order.name)])
-            _logger.info('Bills ++++++++++++===>: {}'.format(bills + invoices))
-            order.invoice_ids = invoices + bills
-            order.invoice_count = len(invoices + bills)
-
     @api.model
     @api.onchange('tax_state')
     def onchange_tax_status(self):
@@ -54,7 +45,8 @@ class PurchaseOrder(models.Model):
                                 'UnitAmount': line.price_unit,
                                 'ItemCode': line.product_id.default_code,
                                 'Quantity': line.product_qty,
-                                'TaxType': tax
+                                'TaxType': tax,
+                                "DiscountRate": line.discount,
                                 }
             else:
                 if line.product_id:
@@ -63,10 +55,12 @@ class PurchaseOrder(models.Model):
                         'UnitAmount': line.price_unit,
                         'ItemCode': line.product_id.default_code,
                         'Quantity': line.product_qty,
+                        "DiscountRate": line.discount,
                     }
                 else:
                     line_vals = {
                         'Description': line.name,
+                        "DiscountRate": line.discount
                         # 'UnitAmount': line.price_unit,
                         # 'ItemCode': line.product_id.default_code,
                         # 'Quantity': line.product_qty,
@@ -91,13 +85,6 @@ class PurchaseOrder(models.Model):
             elif self.tax_state == 'no_tax':
                 tax_state = 'NoTax'
 
-        # if self.picking_type_id:
-        #     if self.dest_address_id:
-        #         partner = self.dest_address_id
-        #         address5 = self.get_address(partner)
-        #     else:
-        #         partner = self.picking_type_id.warehouse_id.partner_id
-        #         address5 = self.get_address(partner)
         if self.state:
             if self.state == 'draft' or self.state == 'sent':
                 status = 'DRAFT'
@@ -158,7 +145,8 @@ class PurchaseOrder(models.Model):
                                 "Description": single_line.name,
                                 "Quantity": single_line.product_qty,
                                 "UnitAmount": single_line.price_unit,
-                                "TaxType":tax
+                                "TaxType":tax,
+                                "DiscountRate": single_line.discount,
                             }
                         ],
                         "Status": status,
@@ -179,6 +167,7 @@ class PurchaseOrder(models.Model):
                             "Description": single_line.name,
                             "Quantity": single_line.product_qty,
                             "UnitAmount": single_line.price_unit,
+                            "DiscountRate": single_line.discount,
                         }
                     ],
                     "Status": status,
@@ -206,10 +195,16 @@ class PurchaseOrder(models.Model):
                         "LineItems": lst_line,
                         "Status": status
                     })
+        currency = self.currency_id if self.currency_id else False
+        if currency:
+            vals.update({"CurrencyCode": currency.name})
         return vals
 
     def get_head(self):
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        if self._context.get('cron'):
+            xero_config = self.company_id
+        else:
+            xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         client_id = xero_config.xero_client_id
         client_secret = xero_config.xero_client_secret
 
@@ -233,6 +228,8 @@ class PurchaseOrder(models.Model):
             purchase = self.browse(self._context.get('active_ids'))
         else:
             purchase = self
+        if purchase and self._context.get('not_cron'):
+            xero_config = purchase[0].company_id
         for t in purchase:
             if not t.xero_purchase_id:
                 vals = t.prepare_purchaseorder_export_dict()
@@ -276,14 +273,12 @@ class PurchaseOrder(models.Model):
             else:
                 vals = t.prepare_purchaseorder_export_dict()
                 parsed_dict = json.dumps(vals)
-                # print("PARSED DICT : ", parsed_dict, type(parsed_dict))
                 if xero_config.xero_oauth_token:
                     token = xero_config.xero_oauth_token
                 headers=self.get_head()
                 if token:
                     protected_url = 'https://api.xero.com/api.xro/2.0/PurchaseOrders/'+t.xero_purchase_id
                     data = requests.request('POST', url=protected_url, headers=headers, data=parsed_dict)
-                    # print("DATA : ", data, data.text)
                     if data.status_code == 200:
                             _logger.info(_("Exported successfully to XERO"))
                     elif data.status_code == 400:
@@ -324,10 +319,17 @@ class PurchaseOrder(models.Model):
 
     @api.model
     def exportPurchaseOrder_cron(self):
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        purchase_id = self.env['purchase.order'].search([('date_approve', '>', xero_config.export_record_after)])
-        for purchase in purchase_id:
-            purchase.exportPurchaseOrder()
+        # xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        companys = self.env['res.company'].search([])
+        self._context['cron'] = 1
+        for xero_config in companys:
+            if xero_config.xero_client_id and xero_config.xero_client_secret:
+                xero_config.refresh_token()
+                purchase_id = self.env['purchase.order'].search([('date_approve', '>', xero_config.export_record_after),('company_id', '=', xero_config.id),('state', '=', 'purchase')])
+                for purchase in purchase_id:
+                    purchase.exportPurchaseOrder()
+            else:
+                continue
 
 
 class PurchaseOderLine(models.Model):

@@ -50,7 +50,7 @@
                                     <field name="message"/>
                                     <field name="model_id"/>
                                     <field name="res_id"/>
-                                    <field name="log_line_type" invisible="1"/>
+                                    <field name="log_line_type" column_invisible="True"/>
                                 </tree>
                             </field>
                         </page>
@@ -77,9 +77,9 @@
         </field>
     </record>
 
-    <menuitem id="menu_log_book_ept" name="Log Book" parent="sale.menu_sale_config"/>
+<!--    <menuitem id="menu_log_book_ept" name="Log Book" parent="sale.menu_sale_config"/>-->
 
-    <menuitem id="mainmenu_common_log_book" name="Common Logs" action="action_common_log_book_ept"
-              parent="menu_log_book_ept" sequence="21"/>
+<!--    <menuitem id="mainmenu_common_log_book" name="Common Logs" action="action_common_log_book_ept"-->
+<!--              parent="menu_log_book_ept" sequence="21"/>-->
 
 </odoo>

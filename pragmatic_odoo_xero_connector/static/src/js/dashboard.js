@@ -1,97 +1,487 @@
-odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
-'use strict';
-	var AbstractAction = require('web.AbstractAction');
-	var core = require('web.core');
-	var session = require('web.session');
-	var rpc = require('web.rpc');
-	var Widget = require('web.Widget');
-    var Dialog = require('web.Dialog');
-    var _t = core._t;
-    var QWeb = core.qweb;
+/** @odoo-module **/
 
-	var XeroDashboardViewNew = AbstractAction.extend({
-
-		template : 'XeroDashboardViewNew',
-		events: {
-        "click #pending_order": "on_pending_order",
-        "click #completed_order": "on_completed_order",
-        "click #unpaid_order": "on_unpaid_order",
-        "click #paid_order": "on_paid_order",
-        "click #pending_sale_order": "on_pending_sale_order",
-        "click #completed_sale_order": "on_completed_sale_order",
-        "click #unpaid_sale_order": "on_unpaid_sale_order",
-        "click #paid_sale_order": "on_paid_sale_order",
-        "click #pending_invoice": "on_pending_invoice",
-        "click #completed_invoice": "on_completed_invoice",
-        "click #paid_invoice": "on_paid_invoice",
-        "click #unpaid_invoice": "on_unpaid_invoice",
-        "click #pending_bill": "on_pending_bill",
-        "click #completed_bill": "on_completed_bill",
-        "click #paid_bill": "on_paid_bill",
-        "click #unpaid_bill": "on_unpaid_bill",
-
-        "click #DataType": "on_DataType",
-        "click #TimeData": "on_DataType",
-        "click #DataType1": "on_DataType1",
-        "click #TimeData1": "on_DataType1",
-        "click #DataType2": "on_DataType2",
-        "click #TimeData2": "on_DataType2",
-        "click #DataType3": "on_DataType3",
-        "click #TimeData3": "on_DataType3",
+import { Component } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
+import { Widget } from "@web/views/widgets/widget";
+import { Dialog } from "@web/core/dialog/dialog";
+import { _t } from "@web/core/l10n/translation";
+import { registry } from "@web/core/registry";
 
 
 
-        },
 
-        init: function(parent, action) {
+	export class XeroDashboardViewNew extends Component {
+	static template = "XeroDashboardViewNew";
+	setup() {
+        this.rpc = useService("rpc");
+        this.action = useService("action");
+        console.log("2222222222222222222222222222222222222222222222222222222")
+        self = this
+//		PURCHASE
+self.rpc("/web/dataset/call_kw/purchase.order/get_pending_order_counts", {
+                model: "purchase.order",
+                method: "get_pending_order_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_order').text(res)
+                var total_order = res
+
+self.rpc("/web/dataset/call_kw/purchase.order/get_waiting_bill_counts", {
+                model: "purchase.order",
+                method: "get_waiting_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#completed_bill').text(res)
+                var waiting_bill = res
+
+
+                self.rpc("/web/dataset/call_kw/account.move/get_unpaid_bill_counts", {
+                model: "account.move",
+                method: "get_unpaid_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_order').text(res)
+                var unpaid_order = res
+
+                self.rpc("/web/dataset/call_kw/account.move/get_paid_bill_counts", {
+                model: "account.move",
+                method: "get_paid_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_order').text(res)
+                var paid_order = res
+
+                self.rpc("/web/dataset/call_kw/purchase.order/purchase_piechart_detail", {
+                model: "purchase.order",
+                method: "purchase_piechart_detail",
+                args: [total_order,paid_order,unpaid_order,waiting_bill],
+                kwargs: {},
+            }).then(function(res) {
+            google.charts.load('current', {'packages':['corechart']});
+            google.charts.setOnLoadCallback(drawChart);
+
+            function drawChart() {
+            var data = google.visualization.arrayToDataTable(res);
+
+            var options = {
+              is3D:true
+            };
+
+            var chart = new google.visualization.PieChart(document.getElementById('chartContainer'));
+              chart.draw(data, options);
+            }
+            });
+            });
+            });
+            });
+            });
+
+
+//		SALE
+            self.rpc("/web/dataset/call_kw/sale.order/get_pending_sale_order_counts", {
+                model: "sale.order",
+                method: "get_pending_sale_order_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_sale_order').text(res)
+                var sale_order = res
+
+
+
+self.rpc("/web/dataset/call_kw/sale.order/get_waiting_invoice_counts", {
+                model: "sale.order",
+                method: "get_waiting_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#completed_invoice').text(res)
+                var waiting_sale = res
+
+                self.rpc("/web/dataset/call_kw/account.move/get_unpaid_invoice_counts", {
+                model: "account.move",
+                method: "get_unpaid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_sale_order').text(res)
+                var unpaid_sale = res
+
+                    self.rpc("/web/dataset/call_kw/account.move/get_paid_invoice_counts", {
+                model: "account.move",
+                method: "get_paid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_sale_order').text(res)
+                var paid_sale = res
+
+
+
+                self.rpc("/web/dataset/call_kw/sale.order/sale_piechart_detail", {
+                model: "sale.order",
+                method: "sale_piechart_detail",
+                args: [paid_sale,unpaid_sale,waiting_sale,sale_order],
+                kwargs: {},
+            }).then(function(res) {
+            google.charts.load('current', {'packages':['corechart']});
+            google.charts.setOnLoadCallback(drawChart);
+
+            function drawChart() {
+            var data = google.visualization.arrayToDataTable(res);
+
+            var options = {
+              is3D:true
+            };
+
+            var chart = new google.visualization.PieChart(document.getElementById('chartContainer1'));
+              chart.draw(data, options);
+            }
+            });
+            });
+            });
+            });
+            });
+
+
+
+//		INVOICE
+            self.rpc("/web/dataset/call_kw/account.move/get_pending_invoice_counts", {
+                model: "account.move",
+                method: "get_pending_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_invoice').text(res)
+                var total_invoice= res
+
+                        self.rpc("/web/dataset/call_kw/account.move/get_xero_unpaid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_unpaid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_invoice').text(res)
+                var unpaid_invoice=res
+
+                self.rpc("/web/dataset/call_kw/account.move/get_xero_paid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_paid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_invoice').text(res)
+                var paid_invoice = res
+
+                self.rpc("/web/dataset/call_kw/account.move/invoice_piechart_detail", {
+                model: "account.move",
+                method: "invoice_piechart_detail",
+                args: [paid_invoice,unpaid_invoice,total_invoice],
+                kwargs: {},
+            }).then(function(res) {
+            google.charts.load('current', {'packages':['corechart']});
+            google.charts.setOnLoadCallback(drawChart);
+
+            function drawChart() {
+            var data = google.visualization.arrayToDataTable(res);
+
+            var options = {
+              is3D:true
+            };
+
+            var chart = new google.visualization.PieChart(document.getElementById('chartContainer2'));
+              chart.draw(data, options);
+            }
+            });
+            });
+            });
+            });
+
+
+//		BILL
+
+
+             self.rpc("/web/dataset/call_kw/account.move/get_pending_bill_counts", {
+                model: "account.move",
+                method: "get_pending_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_bill').text(res)
+                var bill_total = res
+
+                           self.rpc("/web/dataset/call_kw/account.move/get_unpaid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_unpaid_xero_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_bill').text(res)
+                var unpaid = res
+
+                    self.rpc("/web/dataset/call_kw/account.move/get_paid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_paid_xero_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_bill').text(res)
+                var paid =res
+
+
+self.rpc("/web/dataset/call_kw/account.move/bill_piechart_detail", {
+                model: "account.move",
+                method: "bill_piechart_detail",
+                args: [paid,unpaid,bill_total],
+                kwargs: {},
+            }).then(function(res) {
+            google.charts.load('current', {'packages':['corechart']});
+            google.charts.setOnLoadCallback(drawChart);
+
+            function drawChart() {
+            var data = google.visualization.arrayToDataTable(res);
+
+            var options = {
+              is3D:true
+            };
+
+            var chart = new google.visualization.PieChart(document.getElementById('chartContainer3'));
+              chart.draw(data, options);
+            }
+            });
+            });
+            });
+            });
+
+
+
+
+
+//		PURCHASE
+
+		       $('.as_today_meeting_table .today_meeting_line').remove();
+		       self.rpc("/web/dataset/call_kw/purchase.order/get_purchase_order_details", {
+                model: "purchase.order",
+                method: "get_purchase_order_details",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(rec) {
+                if(rec.quotation_number){
+                    for (var j = 0; j < rec.quotation_number.length; j++) {
+
+                    var tr = '';
+                   $('.as_today_meeting_table tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
+                   }
+               }
+		});
+
+//		SALE
+
+
+		       $('.as_today_meeting_table1 .today_meeting_line').remove();
+
+		       self.rpc("/web/dataset/call_kw/sale.order/get_sale_order_details", {
+                model: "sale.order",
+                method: "get_sale_order_details",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(rec) {
+                if(rec.quotation_number){
+                    for (var j = 0; j < rec.quotation_number.length; j++) {
+
+                    var tr = '';
+                   $('.as_today_meeting_table1 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
+                   }
+               }
+		});
+
+
+//		INVOICE
+                    self.rpc("/web/dataset/call_kw/account.move/get_pending_invoice_counts", {
+                model: "account.move",
+                method: "get_pending_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_invoice').text(res)
+
+		});
+
+		self.rpc("/web/dataset/call_kw/sale.order/get_waiting_invoice_counts", {
+                model: "sale.order",
+                method: "get_waiting_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#completed_invoice').text(res)
+
+		});
+
+		self.rpc("/web/dataset/call_kw/account.move/get_xero_unpaid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_unpaid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_invoice').text(res)
+
+		});
+
+		self.rpc("/web/dataset/call_kw/account.move/get_xero_paid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_paid_invoice_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_invoice').text(res)
+
+		});
+		       $('.as_today_meeting_table2 .today_meeting_line').remove();
+
+		       self.rpc("/web/dataset/call_kw/account.move/get_invoice_details", {
+                model: "account.move",
+                method: "get_invoice_details",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(rec) {
+                if(rec.quotation_number){
+                    for (var j = 0; j < rec.quotation_number.length; j++) {
+
+                    var tr = '';
+                   $('.as_today_meeting_table2 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
+                   }
+               }
+		});
+
+
+//		Bill
+
+                self.rpc("/web/dataset/call_kw/account.move/get_pending_bill_counts", {
+                model: "account.move",
+                method: "get_pending_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#pending_bill').text(res)
+
+		});
+
+		self.rpc("/web/dataset/call_kw/purchase.order/get_waiting_bill_counts", {
+                model: "purchase.order",
+                method: "get_waiting_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#completed_bill').text(res)
+
+		});
+
+		self.rpc("/web/dataset/call_kw/account.move/get_unpaid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_unpaid_xero_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#unpaid_bill').text(res)
+
+		});
+		self.rpc("/web/dataset/call_kw/account.move/get_paid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_paid_xero_bill_counts",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(res) {
+                $('#paid_bill').text(res)
+
+		});
+		       $('.as_today_meeting_table3 .today_meeting_line').remove();
+
+		       self.rpc("/web/dataset/call_kw/account.move/get_bill_details", {
+                model: "account.move",
+                method: "get_bill_details",
+                args: ['last_month'],
+                kwargs: {},
+            }).then(function(rec) {
+                if(rec.quotation_number){
+                    for (var j = 0; j < rec.quotation_number.length; j++) {
+
+                    var tr = '';
+                   $('.as_today_meeting_table3 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
+                   }
+               }
+		});
+
+
+        }
+
+
+        init() {
         this.actionManager = parent;
         return this._super.apply(this, arguments);
-        },
+        }
 
-        open_co_living_record: function(e){
-
+        open_co_living_record(e) {
         $('.o_stock_reports_table').show();
-        },
+        }
 
 
 
 
 
 //        DYNAMIC CHART
-        on_DataType : function(){
+
+        async on_DataType() {
+        self = this
         var element = document. getElementById('TimeData').value;
-        rpc.query({model:'purchase.order',
-			           method:'get_waiting_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+
+        this.rpc("/web/dataset/call_kw/purchase.order/get_waiting_bill_counts", {
+                model: "purchase.order",
+                method: "get_waiting_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#completed_bill').text(res)
                 var waiting_bill=res
+                console.log
 
-					rpc.query({model:'account.move',
-			           method:'get_unpaid_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+        self.rpc("/web/dataset/call_kw/account.move/get_unpaid_bill_counts", {
+                model: "account.move",
+                method: "get_unpaid_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#unpaid_order').text(res)
                 var unpaid_order=res
 
-					rpc.query({model:'account.move',
-			           method:'get_paid_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+           self.rpc("/web/dataset/call_kw/account.move/get_paid_bill_counts", {
+                model: "account.move",
+                method: "get_paid_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#paid_order').text(res)
                 var paid_order=res
 
-					   rpc.query({model:'purchase.order',
-			           method:'get_pending_order_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/purchase.order/get_pending_order_counts", {
+                model: "purchase.order",
+                method: "get_pending_order_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#pending_order').text(res)
                 var total_order=res
 
-        rpc.query({model:'purchase.order',
-			           method:'purchase_piechart_detail',
-			           args: [total_order,paid_order,unpaid_order,waiting_bill],
-			           }).then(function(res) {
+
+                self.rpc("/web/dataset/call_kw/purchase.order/purchase_piechart_detail", {
+                model: "purchase.order",
+                method: "purchase_piechart_detail",
+                args: [total_order,paid_order,unpaid_order,waiting_bill],
+                kwargs: {},
+            }).then(function(res) {
 			           var charttype=document.getElementById("DataType").value;
             google.charts.load('current', {'packages':['corechart']});
             google.charts.setOnLoadCallback(drawChart);
@@ -126,9 +516,13 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 //            PURCHASE TABLE ON CLICK
         var element = document. getElementById('TimeData').value;
         $('.as_today_meeting_table .today_meeting_line').remove();
-        rpc.query({model:'purchase.order',
-            method:'get_purchase_order_details',
-            args: [element],
+
+
+        self.rpc("/web/dataset/call_kw/purchase.order/get_purchase_order_details", {
+                model: "purchase.order",
+                method: "get_purchase_order_details",
+                args: [element],
+                kwargs: {},
             }).then(function(rec) {
                 if(rec.quotation_number){
                     for (var j = 0; j < rec.quotation_number.length; j++) {
@@ -143,45 +537,52 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 		});
 		});
 		   });
-        },
+        }
 
-
-        on_DataType1 : function(){
+        async on_DataType1() {
+        self = this
                        var element = document. getElementById('TimeData1').value;
-                       		       rpc.query({model:'sale.order',
-			           method:'get_pending_sale_order_counts',
-			           args: [element],
-			           }).then(function(res) {
+                       self.rpc("/web/dataset/call_kw/sale.order/get_pending_sale_order_counts", {
+                model: "sale.order",
+                method: "get_pending_sale_order_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#pending_sale_order').text(res)
                 var sale_order = res
 
-				rpc.query({model:'sale.order',
-			           method:'get_waiting_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/sale.order/get_waiting_invoice_counts", {
+                model: "sale.order",
+                method: "get_waiting_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#completed_invoice').text(res)
                 var waiting_sale = res
 
-
-							rpc.query({model:'account.move',
-			           method:'get_unpaid_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_unpaid_invoice_counts", {
+                model: "account.move",
+                method: "get_unpaid_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#unpaid_sale_order').text(res)
                 var unpaid_sale = res
 
-
-								rpc.query({model:'account.move',
-			           method:'get_paid_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_paid_invoice_counts", {
+                model: "account.move",
+                method: "get_paid_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#paid_sale_order').text(res)
                 var paid_sale = res
-
-                       rpc.query({model:'sale.order',
-			           method:'sale_piechart_detail',
-			           args: [paid_sale,unpaid_sale,waiting_sale,sale_order],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/sale.order/sale_piechart_detail", {
+                model: "sale.order",
+                method: "sale_piechart_detail",
+                args: [paid_sale,unpaid_sale,waiting_sale,sale_order],
+                kwargs: {},
+            }).then(function(res) {
 
 			           var charttype=document.getElementById("DataType1").value;
 
@@ -222,9 +623,12 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 		});
 		});
 	    $('.as_today_meeting_table1 .today_meeting_line').remove();
-        rpc.query({model:'sale.order',
-            method:'get_sale_order_details',
-            args: [element],
+
+	    self.rpc("/web/dataset/call_kw/sale.order/get_sale_order_details", {
+                model: "sale.order",
+                method: "get_sale_order_details",
+                args: [element],
+                kwargs: {},
             }).then(function(rec) {
                 if(rec.quotation_number){
                     for (var j = 0; j < rec.quotation_number.length; j++) {
@@ -235,37 +639,43 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                }
 		});
 
-        },
+        }
 
-        on_DataType2 : function(){
+
+        async on_DataType2() {
+        self = this
                 var element = document. getElementById('TimeData2').value;
-                rpc.query({model:'account.move',
-			           method:'get_pending_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_pending_invoice_counts", {
+                model: "account.move",
+                method: "get_pending_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#pending_invoice').text(res)
                 var total_invoice= res
-
-
-						rpc.query({model:'account.move',
-			           method:'get_xero_unpaid_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_xero_unpaid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_unpaid_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#unpaid_invoice').text(res)
                 var unpaid_invoice=res
-
-
-							rpc.query({model:'account.move',
-			           method:'get_xero_paid_invoice_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_xero_paid_invoice_counts", {
+                model: "account.move",
+                method: "get_xero_paid_invoice_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#paid_invoice').text(res)
                 var paid_invoice = res
 
-                rpc.query({model:'account.move',
-			           method:'invoice_piechart_detail',
-			           args: [paid_invoice,unpaid_invoice,total_invoice],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/invoice_piechart_detail", {
+                model: "account.move",
+                method: "invoice_piechart_detail",
+                args: [paid_invoice,unpaid_invoice,total_invoice],
+                kwargs: {},
+            }).then(function(res) {
 
 			           var charttype=document.getElementById("DataType2").value;
 			           google.charts.load('current', {'packages':['corechart']});
@@ -302,9 +712,11 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 		});
 		});
 		$('.as_today_meeting_table2 .today_meeting_line').remove();
-        rpc.query({model:'account.move',
-            method:'get_invoice_details',
-            args: [element],
+		self.rpc("/web/dataset/call_kw/account.move/get_invoice_details", {
+                model: "account.move",
+                method: "get_invoice_details",
+                args: [element],
+                kwargs: {},
             }).then(function(rec) {
                 if(rec.quotation_number){
                     for (var j = 0; j < rec.quotation_number.length; j++) {
@@ -317,37 +729,46 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 
 
 
-        },
+        }
 
-        on_DataType3 : function(){
+        async on_DataType3() {
+                       self = this
                         var element = document. getElementById('TimeData3').value;
-                        		                  rpc.query({model:'account.move',
-			           method:'get_pending_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+
+             self.rpc("/web/dataset/call_kw/account.move/get_pending_bill_counts", {
+                model: "account.move",
+                method: "get_pending_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#pending_bill').text(res)
                 var bill_total = res
 
-
-						rpc.query({model:'account.move',
-			           method:'get_unpaid_xero_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_unpaid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_unpaid_xero_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#unpaid_bill').text(res)
                 var unpaid = res
 
 
-						rpc.query({model:'account.move',
-			           method:'get_paid_xero_bill_counts',
-			           args: [element],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/get_paid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_paid_xero_bill_counts",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
                 $('#paid_bill').text(res)
                 var paid =res
 
-                        rpc.query({model:'account.move',
-			           method:'bill_piechart_detail',
-			           args: [paid,unpaid,bill_total],
-			           }).then(function(res) {
+                self.rpc("/web/dataset/call_kw/account.move/bill_piechart_detail", {
+                model: "account.move",
+                method: "bill_piechart_detail",
+                args: [paid,unpaid,bill_total],
+                kwargs: {},
+            }).then(function(res) {
 
 			           var charttype=document.getElementById("DataType3").value;
 
@@ -387,9 +808,11 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 		});
 
 	    $('.as_today_meeting_table3 .today_meeting_line').remove();
-        rpc.query({model:'account.move',
-            method:'get_bill_details',
-            args: [element],
+	    self.rpc("/web/dataset/call_kw/account.move/get_paid_xero_bill_counts", {
+                model: "account.move",
+                method: "get_bill_details",
+                args: [element],
+                kwargs: {},
             }).then(function(rec) {
                 if(rec.quotation_number){
                     for (var j = 0; j < rec.quotation_number.length; j++) {
@@ -402,21 +825,26 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
 
 
 
-        },
+        }
 
 
 //ON CLICK PURCHASE ORDER
 
-        on_pending_order : function(){
+        async on_pending_order(){
+        self = this
+        console.log("11111111111111111111111111111111111111111111111111111111111111111")
         var element = document. getElementById('TimeData').value;
           let context = this;
-        rpc.query({model:'purchase.order',
-			           method:'get_purchase_id',
-			           args: [element],
-			           }).then(function(res) {
-        context.do_action({
+          self.rpc("/web/dataset/call_kw/purchase.order/get_purchase_id", {
+                model: "purchase.order",
+                method: "get_purchase_id",
+                args: [element],
+                kwargs: {},
+            }).then(function(res) {
+
+        self.action.doAction({
                 name: _t('Purchase Order'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'purchase.order',
@@ -426,12 +854,14 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
-        on_completed_order : function(){
-        this.do_action({
+
+        async on_completed_order() {
+        self = this
+        self.action.doAction({
                 name: _t('Purchase Order'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'purchase.order',
@@ -440,16 +870,19 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                 domain : ['&',["state", "=", "done"],["xero_purchase_id", "!=", false]],
             });
 
-        },
+        }
 
-        on_paid_order : function(){
+        async on_paid_order() {
         var element = document. getElementById('TimeData').value;
+        self = this
           let context = this;
-        				rpc.query({model:'account.move',
+        				self.rpc("/web/dataset/call_kw/account.move/get_paid_bill_id", {model:'account.move',
 			           method:'get_paid_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+			           console.log("222222222222222222222222222222222222222222222",res)
+        self.action.doAction({
                 name: _t('Bill'),
                 views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
@@ -461,18 +894,20 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             	});
 
-        },
+        }
 
-        on_unpaid_order : function(){
+        async on_unpaid_order() {
         var element = document. getElementById('TimeData').value;
+        self = this
           let context = this;
-          				rpc.query({model:'account.move',
+          				self.rpc("/web/dataset/call_kw/account.move/get_unpaid_bill_id", {model:'account.move',
 			           method:'get_unpaid_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Bill'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -482,24 +917,26 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
 
 
 //        ON CLICK SALE ORDER
 
 
-        on_completed_invoice : function(){
+        async on_completed_invoice() {
         var element = document. getElementById('TimeData1').value;
+        self = this
         let context = this;
-        rpc.query({model:'sale.order',
+        self.rpc("/web/dataset/call_kw/sale.order/get_waiting_invoice_id", {model:'sale.order',
 			           method:'get_waiting_invoice_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
 			           localStorage.res = res;
-			           context.do_action({
+			           self.action.doAction({
                             name: _t('Invoice'),
-                            views: [[false, 'list']],
+                            views: [[false, 'list'], [false, 'form']],
                             view_type: 'form',
                             view_mode: 'tree,form',
                             res_model: 'sale.order',
@@ -508,23 +945,25 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                             domain : [["id", "=", res]],
                         });
 			            });
-        },
+        }
 
 
 
 
 
 
-        on_pending_sale_order : function(){
+        async on_pending_sale_order() {
         var element = document. getElementById('TimeData1').value;
+        self = this
         let context = this;
-                rpc.query({model:'sale.order',
+                self.rpc("/web/dataset/call_kw/sale.order/get_pending_sale_order_id", {model:'sale.order',
 			           method:'get_pending_sale_order_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                  name: _t('Sale Order'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'sale.order',
@@ -534,12 +973,13 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             		});
 
-        },
+        }
 
-        on_completed_sale_order : function(){
-        this.do_action({
+        async on_completed_sale_order() {
+        self = this
+        self.action.doAction({
                 name: _t('Sale Order'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'sale.order',
@@ -548,18 +988,21 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                 domain : ['&',["state", "=", "done"],["xero_sale_id", "!=", false]],
             });
 
-        },
+        }
 
-        on_paid_sale_order : function(){
+        async on_paid_sale_order() {
         var element = document. getElementById('TimeData1').value;
+        self = this
           let context = this;
-        					rpc.query({model:'account.move',
+        					self.rpc("/web/dataset/call_kw/account.move/get_paid_invoice_id", {model:'account.move',
 			           method:'get_paid_invoice_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+			           console.log("resresresresresresresresresresres",res)
+        self.action.doAction({
                 name: _t('Invoice'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -569,18 +1012,20 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             		});
 
-        },
+        }
 
-        on_unpaid_sale_order : function(){
+        async on_unpaid_sale_order() {
         var element = document. getElementById('TimeData1').value;
+        self = this
           let context = this;
-          			    rpc.query({model:'account.move',
+          			    self.rpc("/web/dataset/call_kw/account.move/get_unpaid_invoice_id", {model:'account.move',
 			           method:'get_unpaid_invoice_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Invoice'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -590,22 +1035,24 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             		});
 
-        },
+        }
 
 
 
 //        Invoice
 
-        on_pending_invoice : function(){
+        async on_pending_invoice() {
         var element = document. getElementById('TimeData2').value;
+        self = this
           let context = this;
-                      rpc.query({model:'account.move',
+                      self.rpc("/web/dataset/call_kw/account.move/get_pending_invoice_id", {model:'account.move',
 			           method:'get_pending_invoice_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Invoices'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -615,19 +1062,21 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             	});
 
-        },
+        }
 
 
-        on_paid_invoice : function(){
+        async on_paid_invoice() {
         var element = document. getElementById('TimeData2').value;
+        self = this
           let context = this;
-        				rpc.query({model:'account.move',
+        				self.rpc("/web/dataset/call_kw/account.move/get_xero_paid_invoice_id", {model:'account.move',
 			           method:'get_xero_paid_invoice_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Invoice'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -637,18 +1086,20 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
-        on_unpaid_invoice : function(){
+        async on_unpaid_invoice() {
         var element = document. getElementById('TimeData2').value;
+        self = this
           let context = this;
-            		   rpc.query({model:'account.move',
+            		   self.rpc("/web/dataset/call_kw/account.move/get_xero_unpaid_invoice_cid", {model:'account.move',
 			           method:'get_xero_unpaid_invoice_cid',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Invoice'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -658,22 +1109,24 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
 
 //        BILL
 
 
-        on_pending_bill : function(){
+        async on_pending_bill() {
         var element = document. getElementById('TimeData3').value;
+        self = this
           let context = this;
-                    rpc.query({model:'account.move',
+                    self.rpc("/web/dataset/call_kw/account.move/get_pending_bill_id", {model:'account.move',
 			           method:'get_pending_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Bill'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -683,19 +1136,21 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
-        on_completed_bill : function(){
+        async on_completed_bill() {
         var element = document. getElementById('TimeData').value;
+        self = this
         let context = this;
-        rpc.query({model:'purchase.order',
+        self.rpc("/web/dataset/call_kw/purchase.order/get_waiting_bill_id", {model:'purchase.order',
 			           method:'get_waiting_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
 			           localStorage.res = res;
-			           context.do_action({
+			           self.action.doAction({
                             name: _t('Bill'),
-                            views: [[false, 'list']],
+                            views: [[false, 'list'], [false, 'form']],
                             view_type: 'form',
                             view_mode: 'tree,form',
                             res_model: 'purchase.order',
@@ -704,18 +1159,20 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                             domain : [["id", "=", res]],
                         });
 			            });
-        },
+        }
 
-        on_paid_bill : function(){
+        async on_paid_bill() {
         var element = document. getElementById('TimeData3').value;
+        self = this
           let context = this;
-        				rpc.query({model:'account.move',
+        				self.rpc("/web/dataset/call_kw/account.move/get_paid_xero_bill_id", {model:'account.move',
 			           method:'get_paid_xero_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Bill'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -725,19 +1182,21 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
             });
             });
 
-        },
+        }
 
-        on_unpaid_bill : function(){
+        async on_unpaid_bill() {
         var element = document. getElementById('TimeData3').value;
+        self= this
 
           let context = this;
-        				rpc.query({model:'account.move',
+        				self.rpc("/web/dataset/call_kw/account.move/get_unpaid_xero_bill_id", {model:'account.move',
 			           method:'get_unpaid_xero_bill_id',
 			           args: [element],
+			           kwargs: {},
 			           }).then(function(res) {
-        context.do_action({
+        self.action.doAction({
                 name: _t('Bill'),
-                views: [[false, 'list']],
+                views: [[false, 'list'], [false, 'form']],
                 view_type: 'form',
                 view_mode: 'tree,form',
                 res_model: 'account.move',
@@ -746,381 +1205,6 @@ odoo.define('pragmatic_odoo_xero_connector.meeting_chart', function(require) {
                 domain : [["id", "in", res]],
             });
             	});
-
-        },
-
-
-
-
-
-		start : function() {
-//		PURCHASE
-        		            rpc.query({model:'purchase.order',
-			           method:'get_pending_order_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_order').text(res)
-                var total_order = res
-
-
-//		rpc.query({model:'purchase.order',
-//			           method:'get_completed_order_counts',
-//			           args: [],
-//			           }).then(function(res) {
-//                $('#completed_order').text(res)
-                	rpc.query({model:'purchase.order',
-			           method:'get_waiting_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#completed_bill').text(res)
-                var waiting_bill = res
-
-
-				rpc.query({model:'account.move',
-			           method:'get_unpaid_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_order').text(res)
-                var unpaid_order = res
-
-
-					rpc.query({model:'account.move',
-			           method:'get_paid_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_order').text(res)
-                var paid_order = res
-
-		rpc.query({model:'purchase.order',
-			           method:'purchase_piechart_detail',
-			           args: [total_order,paid_order,unpaid_order,waiting_bill],
-			           }).then(function(res) {
-            google.charts.load('current', {'packages':['corechart']});
-            google.charts.setOnLoadCallback(drawChart);
-
-            function drawChart() {
-            var data = google.visualization.arrayToDataTable(res);
-
-            var options = {
-              is3D:true
-            };
-
-            var chart = new google.visualization.PieChart(document.getElementById('chartContainer'));
-              chart.draw(data, options);
-            }
-            });
-            });
-            });
-            });
-            });
-
-
-//		SALE
-
-            rpc.query({model:'sale.order',
-			           method:'get_pending_sale_order_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_sale_order').text(res)
-                var sale_order = res
-
-
-
-//		rpc.query({model:'sale.order',
-//			           method:'get_completed_sale_order_counts',
-//			           args: [],
-//			           }).then(function(res) {
-//                $('#completed_sale_order').text(res)
-        rpc.query({model:'sale.order',
-			           method:'get_waiting_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#completed_invoice').text(res)
-                var waiting_sale = res
-
-
-				rpc.query({model:'account.move',
-			           method:'get_unpaid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_sale_order').text(res)
-                var unpaid_sale = res
-
-
-					rpc.query({model:'account.move',
-			           method:'get_paid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_sale_order').text(res)
-                var paid_sale = res
-
-
-
-
-				rpc.query({model:'sale.order',
-			           method:'sale_piechart_detail',
-			           args: [paid_sale,unpaid_sale,waiting_sale,sale_order],
-			           }).then(function(res) {
-            google.charts.load('current', {'packages':['corechart']});
-            google.charts.setOnLoadCallback(drawChart);
-
-            function drawChart() {
-            var data = google.visualization.arrayToDataTable(res);
-
-            var options = {
-              is3D:true
-            };
-
-            var chart = new google.visualization.PieChart(document.getElementById('chartContainer1'));
-              chart.draw(data, options);
-            }
-            });
-            });
-            });
-            });
-            });
-
-
-
-//		INVOICE
-
-            rpc.query({model:'account.move',
-			           method:'get_pending_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_invoice').text(res)
-                var total_invoice= res
-
-
-						rpc.query({model:'account.move',
-			           method:'get_xero_unpaid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_invoice').text(res)
-                var unpaid_invoice=res
-
-
-							rpc.query({model:'account.move',
-			           method:'get_xero_paid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_invoice').text(res)
-                var paid_invoice = res
-
-				rpc.query({model:'account.move',
-			           method:'invoice_piechart_detail',
-			           args: [paid_invoice,unpaid_invoice,total_invoice],
-			           }).then(function(res) {
-            google.charts.load('current', {'packages':['corechart']});
-            google.charts.setOnLoadCallback(drawChart);
-
-            function drawChart() {
-            var data = google.visualization.arrayToDataTable(res);
-
-            var options = {
-              is3D:true
-            };
-
-            var chart = new google.visualization.PieChart(document.getElementById('chartContainer2'));
-              chart.draw(data, options);
-            }
-            });
-            });
-            });
-            });
-
-
-//		BILL
-
-                             		                  rpc.query({model:'account.move',
-			           method:'get_pending_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_bill').text(res)
-                var bill_total = res
-
-
-						rpc.query({model:'account.move',
-			           method:'get_unpaid_xero_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_bill').text(res)
-                var unpaid = res
-
-
-						rpc.query({model:'account.move',
-			           method:'get_paid_xero_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_bill').text(res)
-                var paid =res
-
-
-
-				rpc.query({model:'account.move',
-			           method:'bill_piechart_detail',
-			           args: [paid,unpaid,bill_total],
-			           }).then(function(res) {
-            google.charts.load('current', {'packages':['corechart']});
-            google.charts.setOnLoadCallback(drawChart);
-
-            function drawChart() {
-            var data = google.visualization.arrayToDataTable(res);
-
-            var options = {
-              is3D:true
-            };
-
-            var chart = new google.visualization.PieChart(document.getElementById('chartContainer3'));
-              chart.draw(data, options);
-            }
-            });
-            });
-            });
-            });
-
-
-
-
-
-//		PURCHASE
-
-		       $('.as_today_meeting_table .today_meeting_line').remove();
-        rpc.query({model:'purchase.order',
-            method:'get_purchase_order_details',
-            args: ['last_month'],
-            }).then(function(rec) {
-                if(rec.quotation_number){
-                    for (var j = 0; j < rec.quotation_number.length; j++) {
-
-                    var tr = '';
-                   $('.as_today_meeting_table tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
-                   }
-               }
-		});
-
-//		SALE
-
-
-		       $('.as_today_meeting_table1 .today_meeting_line').remove();
-        rpc.query({model:'sale.order',
-            method:'get_sale_order_details',
-            args: ['last_month'],
-            }).then(function(rec) {
-                if(rec.quotation_number){
-                    for (var j = 0; j < rec.quotation_number.length; j++) {
-
-                    var tr = '';
-                   $('.as_today_meeting_table1 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
-                   }
-               }
-		});
-
-
-//		INVOICE
-
-                  rpc.query({model:'account.move',
-			           method:'get_pending_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_invoice').text(res)
-
-		});
-
-		rpc.query({model:'sale.order',
-			           method:'get_waiting_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#completed_invoice').text(res)
-
-		});
-				rpc.query({model:'account.move',
-			           method:'get_xero_unpaid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_invoice').text(res)
-
-		});
-					rpc.query({model:'account.move',
-			           method:'get_xero_paid_invoice_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_invoice').text(res)
-
-		});
-		       $('.as_today_meeting_table2 .today_meeting_line').remove();
-        rpc.query({model:'account.move',
-            method:'get_invoice_details',
-            args: ['last_month'],
-            }).then(function(rec) {
-                if(rec.quotation_number){
-                    for (var j = 0; j < rec.quotation_number.length; j++) {
-
-                    var tr = '';
-                   $('.as_today_meeting_table2 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
-                   }
-               }
-		});
-
-
-//		Bill
-
-                  rpc.query({model:'account.move',
-			           method:'get_pending_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#pending_bill').text(res)
-
-		});
-		rpc.query({model:'purchase.order',
-			           method:'get_waiting_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#completed_bill').text(res)
-
-		});
-				rpc.query({model:'account.move',
-			           method:'get_unpaid_xero_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#unpaid_bill').text(res)
-
-		});
-					rpc.query({model:'account.move',
-			           method:'get_paid_xero_bill_counts',
-			           args: ['last_month'],
-			           }).then(function(res) {
-                $('#paid_bill').text(res)
-
-		});
-		       $('.as_today_meeting_table3 .today_meeting_line').remove();
-        rpc.query({model:'account.move',
-            method:'get_bill_details',
-            args: ['last_month'],
-            }).then(function(rec) {
-                if(rec.quotation_number){
-                    for (var j = 0; j < rec.quotation_number.length; j++) {
-
-                    var tr = '';
-                   $('.as_today_meeting_table3 tbody').append('<tr class="today_meeting_line"><td class="o_report_line_header29"><span>'+ rec.quotation_number[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.create_date[j] +'</span></td><td class="o_report_line_header29"><span>'+ rec.total[j] +'</span></td></tr>')
-                   }
-               }
-		});
-
-
-
-
-
-
-
-
-
-            },
-
-		});
-
-	core.action_registry.add('meeting_chart', XeroDashboardViewNew);
-	return {
-		XeroDashboardViewNew : XeroDashboardViewNew,
-	};
-});
+        }
+		}
+registry.category("actions").add("meeting_chart", XeroDashboardViewNew);

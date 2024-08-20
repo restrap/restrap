@@ -1,3 +1,5 @@
+import re
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError, RedirectWarning
 import requests
@@ -5,6 +7,8 @@ import json
 import base64
 import logging
 from lxml import etree
+
+from odoo.tools import frozendict
 
 _logger = logging.getLogger(__name__)
 
@@ -22,99 +26,92 @@ class Invoice(models.Model):
     inclusive = fields.Boolean('Inclusive', default=False, copy=False)
     sale_purchase = fields.Selection([('sale', 'sale'), ('purchase', 'purchase')])
 
-    # @api.onchange('partner_id')
-    # def _onchange_partner_id(self):
-    #     self = self.with_company(self.journal_id.company_id)
+    @api.onchange('partner_id')
+    def _onchange_partner_id(self):
+        self = self.with_company(self.journal_id.company_id)
 
-    #     warning = {}
-    #     if self.partner_id:
-    #         rec_account = self.partner_id.property_account_receivable_id
-    #         pay_account = self.partner_id.property_account_payable_id
-    #         if not rec_account and not pay_account:
-    #             action = self.env.ref('account.action_account_config')
-    #             msg = _('Receivable and Payable Accounts are not found.')
-    #             raise RedirectWarning(
-    #                 msg, action.id, _('Go to the configuration panel'))
-    #         p = self.partner_id
-    #         if p.invoice_warn == 'no-message' and p.parent_id:
-    #             p = p.parent_id
-    #         if p.invoice_warn and p.invoice_warn != 'no-message':
-    # Block if partner only has warning but parent company is
-    # blocked
-    #             if p.invoice_warn != 'block' and p.parent_id and p.parent_id.invoice_warn == 'block':
-    #                 p = p.parent_id
-    #             warning = {
-    #                 'title': _("Warning for %s", p.name),
-    #                 'message': p.invoice_warn_msg
-    #             }
-    #             if p.invoice_warn == 'block':
-    #                 self.partner_id = False
-    #                 return {'warning': warning}
+        warning = {}
+        if self.partner_id:
+            rec_account = self.partner_id.property_account_receivable_id
+            pay_account = self.partner_id.property_account_payable_id
+            if not rec_account and not pay_account:
+                action = self.env.ref('account.action_account_config')
+                msg = _('Receivable and Payable Accounts are not found.')
+                raise RedirectWarning(msg, action.id, _('Go to the configuration panel'))
+            p = self.partner_id
+            if p.invoice_warn == 'no-message' and p.parent_id:
+                p = p.parent_id
+            if p.invoice_warn and p.invoice_warn != 'no-message':
+                # Block if partner only has warning but parent company is blocked
+                if p.invoice_warn != 'block' and p.parent_id and p.parent_id.invoice_warn == 'block':
+                    p = p.parent_id
+                warning = {
+                    'title': _("Warning for %s", p.name),
+                    'message': p.invoice_warn_msg
+                }
+                if p.invoice_warn == 'block':
+                    self.partner_id = False
+                    return {'warning': warning}
 
-    #     if self.is_sale_document(include_receipts=True) and self.partner_id:
-    #         self.invoice_payment_term_id = self.partner_id.property_payment_term_id or self.invoice_payment_term_id
-    #         new_term_account = self.partner_id.commercial_partner_id.property_account_receivable_id
-    #     elif self.is_purchase_document(include_receipts=True) and self.partner_id:
-    #         self.invoice_payment_term_id = self.partner_id.property_supplier_payment_term_id or self.invoice_payment_term_id
-    #         new_term_account = self.partner_id.commercial_partner_id.property_account_payable_id
-    #     else:
-    #         new_term_account = None
+        if self.is_sale_document(include_receipts=True) and self.partner_id:
+            self.invoice_payment_term_id = self.partner_id.property_payment_term_id or self.invoice_payment_term_id
+            new_term_account = self.partner_id.commercial_partner_id.property_account_receivable_id
+        elif self.is_purchase_document(include_receipts=True) and self.partner_id:
+            self.invoice_payment_term_id = self.partner_id.property_supplier_payment_term_id or self.invoice_payment_term_id
+            new_term_account = self.partner_id.commercial_partner_id.property_account_payable_id
+        else:
+            new_term_account = None
 
-    #     for line in self.line_ids:
-    #         line.partner_id = self.partner_id.commercial_partner_id
+        for line in self.line_ids:
+            line.partner_id = self.partner_id.commercial_partner_id
 
-    #         if new_term_account and line.account_id.user_type_id and line.account_id.user_type_id.type in ('receivable', 'payable'):
-    #             line.account_id = new_term_account
+            if new_term_account and line.account_id.account_type and line.account_id.account_type in (
+                    'receivable', 'payable'):
+                line.account_id = new_term_account
 
-    #     self._compute_bank_partner_id()
-    #     self.partner_bank_id = self.bank_partner_id.bank_ids and self.bank_partner_id.bank_ids[
-    #         0]
+        self._compute_bank_partner_id()
+        self.partner_bank_id = self.bank_partner_id.bank_ids and self.bank_partner_id.bank_ids[0]
 
-    # Find the new fiscal position.
-    #     delivery_partner_id = self._get_invoice_delivery_partner_id()
-    #     self.fiscal_position_id = self.env['account.fiscal.position'].get_fiscal_position(
-    #         self.partner_id.id, delivery_id=delivery_partner_id)
-    #     self._recompute_dynamic_lines()
-    #     if warning:
-    #         return {'warning': warning}
+        # Find the new fiscal position.
+        self.fiscal_position_id = self.env['account.fiscal.position']._get_fiscal_position(
+            self.partner_id)
+        # delivery_partner_id = self._get_invoice_delivery_partner_id()
+        # self.fiscal_position_id = self.env['account.fiscal.position'].get_fiscal_position(
+        #     self.partner_id.id, delivery_id=delivery_partner_id)
+        # self._recompute_dynamic_lines()
+        if warning:
+            return {'warning': warning}
 
     # @api.model
     # def _fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
     #     """ Set the correct domain for `partner_id`, depending on invoice type """
     #     result = super(Invoice, self)._fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,
-    #                                                    submenu=submenu)
+    #                                                           submenu=submenu)
     #     _logger.info("CONTEXT IS ---------------> {}".format(self._context))
     #     document_type = self._context.get('default_move_type')
     #     _logger.info("DOCUMENT TYPE IS --> {}".format(document_type))
     #     if view_type == 'form':
     #         doc = etree.XML(result['arch'])
-    #         _logger.info(
-    #             "CONTEXT IS *************---------------> {}".format(doc))
-    #         node = doc.xpath(
-    #             "//field[@name='invoice_line_ids']/tree/field[@name='tax_ids']")[0]
+    #         _logger.info("CONTEXT IS *************---------------> {}".format(doc))
+    #         node = doc.xpath("//field[@name='invoice_line_ids']/tree/field[@name='tax_ids']")[0]
     #         node2 = doc.xpath("//field[@name='partner_id']")[0]
-    #         _logger.info(
-    #             "CONTEXT IS *************---------------> {}".format(node))
+    #         _logger.info("CONTEXT IS *************---------------> {}".format(node))
     #         if document_type == 'in_invoice':
     #             _logger.info("DOCUMENT IS OF TYPE VENDOR BILL")
-    #             node.set(
-    #                 'domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
-    #             # node2.set('domain', "[('supplier_rank', '>=', 1)]")
+    #             node.set('domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
+    #             node2.set('domain', "[('supplier_rank', '>=', 1)]")
     #         if document_type == 'out_invoice':
     #             _logger.info("DOCUMENT IS OF TYPE CUSTOMER INVOICE")
-    #             node.set(
-    #                 'domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
-    #             # node2.set('domain', "[('customer_rank', '>=', 1)]")
+    #             node.set('domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
+    #             node2.set('domain', "[('customer_rank', '>=', 1)]")
     #         if document_type == 'out_refund':
     #             _logger.info("DOCUMENT IS OF TYPE CUSTOMER CREDIT NOTE")
-    #             node.set(
-    #                 'domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
-    #             # node2.set('domain', "[('customer_rank', '>=', 1)]")
+    #             node.set('domain', "[('type_tax_use', '=', 'sale'),('price_include','=', inclusive)]")
+    #             node2.set('domain', "[('customer_rank', '>=', 1)]")
     #         if document_type == 'in_refund':
     #             _logger.info("DOCUMENT IS OF TYPE  VENDOR CREDIT NOTE")
-    #             node.set(
-    #                 'domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
-    #             # node2.set('domain', "[('supplier_rank', '>=', 1)]")
+    #             node.set('domain', "[('type_tax_use', '=', 'purchase'),('price_include','=', inclusive)]")
+    #             node2.set('domain', "[('supplier_rank', '>=', 1)]")
     #
     #         result['arch'] = etree.tostring(doc)
     #     return result
@@ -135,16 +132,22 @@ class Invoice(models.Model):
             else:
                 self.inclusive = False
 
+        for line_id in self.invoice_line_ids:
+            if self.tax_state == 'inclusive':
+                line_id.inclusive = True
+            elif self.tax_state == 'exclusive':
+                line_id.inclusive = False
+            # if (self.tax_state == 'no_tax'):
+            #     line_id.inclusive = False
+
     @api.model
     def prepare_invoice_export_line_dict(self, line):
 
-        company = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         line_vals = {}
         account_code = None
         if self.partner_id:
-            line_tax = self.env['account.tax'].search(
-                [('id', '=', line.tax_ids.id), ('company_id', '=', company.id)])
+            line_tax = self.env['account.tax'].search([('id', '=', line.tax_ids.id), ('company_id', '=', company.id)])
 
             if line.quantity < 0:
                 qty = -line.quantity
@@ -158,12 +161,21 @@ class Invoice(models.Model):
             else:
                 discount = 0.0
 
+            Tracking_list = []
+            if line.analytic_distribution:
+                for analytic_dist_id in line.analytic_distribution:
+                    analytic_account_id = self.env['account.analytic.account'].search(
+                        [('id', '=', analytic_dist_id)])
+                    analytic_account_id.create_analytic_account_in_xero(
+                        account_id=analytic_account_id.id)
+                    Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                          'Option': analytic_account_id.name})
+
             if line.account_id:
                 if line.account_id.xero_account_id:
                     account_code = line.account_id.code
                 else:
-                    self.env['account.account'].create_account_ref_in_xero(
-                        line.account_id)
+                    self.env['account.account'].create_account_ref_in_xero(line.account_id)
                     if line.account_id.xero_account_id:
                         account_code = line.account_id.code
 
@@ -184,6 +196,7 @@ class Invoice(models.Model):
                             'AccountCode': account_code,
                             'Quantity': qty,
                             'DiscountRate': discount,
+                            "Tracking": Tracking_list,
                             'TaxType': tax
                         }
                     else:
@@ -194,6 +207,7 @@ class Invoice(models.Model):
                             'AccountCode': account_code,
                             'Quantity': qty,
                             'DiscountRate': discount,
+                            "Tracking": Tracking_list,
                         }
                 else:
                     line_vals = {
@@ -203,6 +217,7 @@ class Invoice(models.Model):
                         'AccountCode': account_code,
                         'Quantity': qty,
                         'DiscountRate': discount,
+                        "Tracking": Tracking_list,
                     }
             else:
                 if line.tax_ids:
@@ -220,7 +235,8 @@ class Invoice(models.Model):
                             'AccountCode': account_code,
                             'Quantity': qty,
                             'DiscountRate': discount,
-                            'TaxType': tax
+                            'TaxType': tax,
+                            "Tracking": Tracking_list,
                         }
                     else:
                         line_vals = {
@@ -229,6 +245,7 @@ class Invoice(models.Model):
                             'AccountCode': account_code,
                             'Quantity': qty,
                             'DiscountRate': discount,
+                            "Tracking": Tracking_list,
                         }
                 else:
                     line_vals = {
@@ -237,24 +254,25 @@ class Invoice(models.Model):
                         'AccountCode': account_code,
                         'DiscountRate': discount,
                         'Quantity': qty,
+                        "Tracking": Tracking_list,
                     }
         return line_vals
 
     @api.model
     def prepare_invoice_export_dict(self):
-        company = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        if self._context.get('cron'):
+            company = self.company_id
+        else:
+            company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         if self.move_type == 'in_invoice':
             vals = self.prepare_vendorbill_export_dict()
             return vals
         else:
 
-            if self.partner_id:
-                cust_id = self.env['res.partner'].get_xero_partner_ref(
-                    self.partner_id)
+            if self.env.user.company_id.export_bill_parent_contact and self.partner_id.parent_id:
+                cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id.parent_id)
             else:
-                cust_id = self.env['res.partner'].get_xero_partner_ref(
-                    self.partner_id)
+                cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id)
 
             vals = {}
             lst_line = []
@@ -295,6 +313,15 @@ class Invoice(models.Model):
 
             if len(self.invoice_line_ids) == 1:
                 single_line = self.invoice_line_ids
+                Tracking_list = []
+                if single_line.analytic_distribution:
+                    for analytic_dist_id in single_line.analytic_distribution:
+                        analytic_account_id = self.env['account.analytic.account'].search(
+                            [('id', '=', analytic_dist_id)])
+                        analytic_account_id.create_analytic_account_in_xero(
+                            account_id=analytic_account_id.id)
+                        Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                              'Option': analytic_account_id.name})
 
                 if single_line.quantity < 0:
                     qty = -single_line.quantity
@@ -312,8 +339,7 @@ class Invoice(models.Model):
                     if single_line.account_id.xero_account_id:
                         account_code = single_line.account_id.code
                     else:
-                        self.env['account.account'].create_account_ref_in_xero(
-                            single_line.account_id)
+                        self.env['account.account'].create_account_ref_in_xero(single_line.account_id)
                         if single_line.account_id.xero_account_id:
                             account_code = single_line.account_id.code
 
@@ -321,8 +347,7 @@ class Invoice(models.Model):
                     if single_line.product_id.xero_product_id:
                         _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                     elif not single_line.product_id.xero_product_id:
-                        self.env['product.product'].get_xero_product_ref(
-                            single_line.product_id)
+                        self.env['product.product'].get_xero_product_ref(single_line.product_id)
 
                     if single_line.tax_ids:
                         line_tax = self.env['account.tax'].search(
@@ -330,8 +355,7 @@ class Invoice(models.Model):
                         if line_tax:
                             tax = line_tax.xero_tax_type_id
                             if not tax:
-                                self.env['account.tax'].get_xero_tax_ref(
-                                    line_tax)
+                                self.env['account.tax'].get_xero_tax_ref(line_tax)
                                 line_tax = self.env['account.tax'].search(
                                     [('id', '=', single_line.tax_ids.id), ('company_id', '=', company.id)])
                                 tax = line_tax.xero_tax_type_id
@@ -343,7 +367,8 @@ class Invoice(models.Model):
                                 "Type": type,
                                 "LineAmountTypes": tax_state,
                                 "DueDate": str(self.invoice_date_due),
-                                "Date": str(self.invoice_date),
+                                # "Date": str(self.invoice_date),
+                                "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                                 "Reference": origin_reference,
                                 "InvoiceNumber": self.xero_invoice_number if (
                                         self.xero_invoice_number and self.xero_invoice_id) else self.name,
@@ -355,11 +380,13 @@ class Invoice(models.Model):
                                         "ItemCode": single_line.product_id.default_code,
                                         "AccountCode": account_code,
                                         "DiscountRate": discount,
+                                        "Tracking": Tracking_list,
                                         "TaxType": tax
                                     }
                                 ],
                                 "Status": status
                             })
+
 
                     else:
                         vals.update({
@@ -370,7 +397,8 @@ class Invoice(models.Model):
                             "Type": type,
                             "LineAmountTypes": tax_state,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "Reference": origin_reference,
                             "InvoiceNumber": self.xero_invoice_number if (
                                     self.xero_invoice_number and self.xero_invoice_id) else self.name,
@@ -381,7 +409,7 @@ class Invoice(models.Model):
                                     "UnitAmount": price,
                                     'ItemCode': single_line.product_id.default_code,
                                     "DiscountRate": discount,
-
+                                    "Tracking": Tracking_list,
                                     "AccountCode": account_code
                                 }
                             ],
@@ -394,8 +422,7 @@ class Invoice(models.Model):
                         if line_tax:
                             tax = line_tax.xero_tax_type_id
                             if not tax:
-                                self.env['account.tax'].get_xero_tax_ref(
-                                    line_tax)
+                                self.env['account.tax'].get_xero_tax_ref(line_tax)
                                 line_tax = self.env['account.tax'].search(
                                     [('id', '=', single_line.tax_ids.id), ('company_id', '=', company.id)])
                                 tax = line_tax.xero_tax_type_id
@@ -407,7 +434,8 @@ class Invoice(models.Model):
                                 "Type": type,
                                 "LineAmountTypes": tax_state,
                                 "DueDate": str(self.invoice_date_due),
-                                "Date": str(self.invoice_date),
+                                # "Date": str(self.invoice_date),
+                                "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                                 "Reference": origin_reference,
                                 "InvoiceNumber": self.xero_invoice_number if (
                                         self.xero_invoice_number and self.xero_invoice_id) else self.name,
@@ -418,6 +446,7 @@ class Invoice(models.Model):
                                         "UnitAmount": price,
                                         "AccountCode": account_code,
                                         "DiscountRate": discount,
+                                        "Tracking": Tracking_list,
                                         "TaxType": tax
                                     }
                                 ],
@@ -430,7 +459,8 @@ class Invoice(models.Model):
                             },
                             "Type": type,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "Reference": origin_reference,
                             "InvoiceNumber": self.xero_invoice_number if (
                                     self.xero_invoice_number and self.xero_invoice_id) else self.name,
@@ -440,6 +470,7 @@ class Invoice(models.Model):
                                     "DiscountRate": discount,
                                     "Quantity": qty,
                                     "UnitAmount": price,
+                                    "Tracking": Tracking_list,
                                     "AccountCode": account_code
                                 }
                             ],
@@ -453,8 +484,7 @@ class Invoice(models.Model):
                         if line.product_id.xero_product_id:
                             _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                         elif not line.product_id.xero_product_id:
-                            self.env['product.product'].get_xero_product_ref(
-                                line.product_id)
+                            self.env['product.product'].get_xero_product_ref(line.product_id)
 
                     line_vals = self.prepare_invoice_export_line_dict(line)
                     lst_line.append(line_vals)
@@ -463,7 +493,8 @@ class Invoice(models.Model):
                     "LineAmountTypes": tax_state,
                     "Contact": {"ContactID": cust_id},
                     "DueDate": str(self.invoice_date_due),
-                    "Date": str(self.invoice_date),
+                    # "Date": str(self.invoice_date),
+                    "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                     "Reference": origin_reference,
                     "InvoiceNumber": self.xero_invoice_number if (
                             self.xero_invoice_number and self.xero_invoice_id) else self.name,
@@ -475,20 +506,32 @@ class Invoice(models.Model):
                 currency_code = self.currency_id.name
                 vals.update({"CurrencyCode": currency_code})
             _logger.info('vals : {}'.format(vals))
+            # Filter currency rates based on the given date
+            # currency_rates = self.currency_id.rate_ids.filtered(lambda rate: self.invoice_date == rate.name)
+            # # If currency rate is found, update the vals dictionary
+            # if currency_rates:
+            #     vals["CurrencyRate"] = currency_rates[0].company_rate
+            if self.currency_id != company.currency_id:
+                date = self.date if company.invoice_bill_accounting_date else self.invoice_date
+                currency_rates = self.currency_id.rate_ids.filtered(lambda rate: date >= rate.name)
+                if currency_rates:
+                    currency_rates = max(currency_rates).company_rate
+                else:
+                    currency_rates = 1
+                vals["CurrencyRate"] = currency_rates
+
             return vals
 
     # -----------------------------------------------------------------------------------------
     @api.model
     def prepare_credit_note_export_line_dict(self, line):
 
-        company = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         line_vals = {}
         account_code = None
 
         if self.partner_id:
-            line_tax = self.env['account.tax'].search(
-                [('id', '=', line.tax_ids.id), ('company_id', '=', company.id)])
+            line_tax = self.env['account.tax'].search([('id', '=', line.tax_ids.id), ('company_id', '=', company.id)])
 
             if line.quantity < 0:
                 qty = -line.quantity
@@ -497,12 +540,31 @@ class Invoice(models.Model):
                 qty = line.quantity
                 price = line.price_unit
 
+            Tracking_list = []
+            if line.analytic_distribution:
+                for analytic_dist_id in line.analytic_distribution:
+                    analytic_account_id = self.env['account.analytic.account'].search(
+                        [('id', '=', analytic_dist_id)])
+                    analytic_account_id.create_analytic_account_in_xero(
+                        account_id=analytic_account_id.id)
+                    Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                          'Option': analytic_account_id.name})
+
             if line.account_id:
-                if line.account_id.xero_account_id:
+                if line.product_id.detailed_type == 'product':
+                    if company.non_tracked_item:
+                        account_code = line.account_id.code
+                    elif company.export_bill_without_product:
+                        account_code = line.account_id.code
+                    else:
+                        account_code = line.product_id.categ_id.xero_inventory_account.code
+                    if not company.non_tracked_item:
+                        if not account_code:
+                            raise UserError(_("Please Set XERO Inventory Account Field In Product Category "))
+                elif line.account_id.xero_account_id:
                     account_code = line.account_id.code
                 else:
-                    self.env['account.account'].create_account_ref_in_xero(
-                        line.account_id)
+                    self.env['account.account'].create_account_ref_in_xero(line.account_id)
                     if line.account_id.xero_account_id:
                         account_code = line.account_id.code
 
@@ -524,7 +586,8 @@ class Invoice(models.Model):
                             'ItemCode': line.product_id.default_code,
                             'AccountCode': account_code,
                             'Quantity': qty,
-                            'TaxType': tax
+                            'TaxType': tax,
+                            'Tracking': Tracking_list
                         }
                 else:
 
@@ -534,6 +597,7 @@ class Invoice(models.Model):
                         'ItemCode': line.product_id.default_code,
                         'AccountCode': account_code,
                         'Quantity': qty,
+                        'Tracking': Tracking_list
                     }
             else:
                 if line.tax_ids:
@@ -550,7 +614,8 @@ class Invoice(models.Model):
                             'UnitAmount': price,
                             'AccountCode': account_code,
                             'Quantity': qty,
-                            'TaxType': tax
+                            'TaxType': tax,
+                            'Tracking': Tracking_list
                         }
                 else:
                     line_vals = {
@@ -558,20 +623,18 @@ class Invoice(models.Model):
                         'UnitAmount': price,
                         'AccountCode': account_code,
                         'Quantity': qty,
+                        'Tracking': Tracking_list
                     }
         return line_vals
 
     @api.model
     def prepare_credit_note_export_dict(self):
-        company = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
 
-        if self.partner_id:
-            cust_id = self.env['res.partner'].get_xero_partner_ref(
-                self.partner_id)
+        if self.env.user.company_id.export_bill_parent_contact and self.partner_id.parent_id:
+            cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id.parent_id)
         else:
-            cust_id = self.env['res.partner'].get_xero_partner_ref(
-                self.partner_id)
+            cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id)
 
         vals = {}
         lst_line = []
@@ -608,6 +671,16 @@ class Invoice(models.Model):
         if len(self.invoice_line_ids) == 1:
             single_line = self.invoice_line_ids
 
+            Tracking_list = []
+            if single_line.analytic_distribution:
+                for analytic_dist_id in single_line.analytic_distribution:
+                    analytic_account_id = self.env['account.analytic.account'].search(
+                        [('id', '=', analytic_dist_id)])
+                    analytic_account_id.create_analytic_account_in_xero(
+                        account_id=analytic_account_id.id)
+                    Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                          'Option': analytic_account_id.name})
+
             if single_line.quantity < 0:
                 qty = -single_line.quantity
                 price = -single_line.price_unit
@@ -619,8 +692,7 @@ class Invoice(models.Model):
                 if single_line.account_id.xero_account_id:
                     account_code = single_line.account_id.code
                 else:
-                    self.env['account.account'].create_account_ref_in_xero(
-                        single_line.account_id)
+                    self.env['account.account'].create_account_ref_in_xero(single_line.account_id)
                     if single_line.account_id.xero_account_id:
                         account_code = single_line.account_id.code
 
@@ -630,8 +702,7 @@ class Invoice(models.Model):
                 if single_line.product_id.xero_product_id:
                     _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                 elif not single_line.product_id.xero_product_id:
-                    self.env['product.product'].get_xero_product_ref(
-                        single_line.product_id)
+                    self.env['product.product'].get_xero_product_ref(single_line.product_id)
 
                 if single_line.tax_ids:
                     line_tax = self.env['account.tax'].search(
@@ -651,7 +722,8 @@ class Invoice(models.Model):
                             "Type": type,
                             "LineAmountTypes": tax_state,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "CreditNoteNumber": self.xero_invoice_number if (
                                     self.xero_invoice_number and self.xero_invoice_id) else self.name,
                             "LineItems": [
@@ -661,7 +733,8 @@ class Invoice(models.Model):
                                     "UnitAmount": price,
                                     'ItemCode': single_line.product_id.default_code,
                                     "AccountCode": account_code,
-                                    "TaxType": tax
+                                    "TaxType": tax,
+                                    "Tracking": Tracking_list
                                 }
                             ],
                             "Status": status
@@ -674,7 +747,8 @@ class Invoice(models.Model):
                         "Type": type,
                         "LineAmountTypes": tax_state,
                         "DueDate": str(self.invoice_date_due),
-                        "Date": str(self.invoice_date),
+                        # "Date": str(self.invoice_date),
+                        "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                         "CreditNoteNumber": self.xero_invoice_number if (
                                 self.xero_invoice_number and self.xero_invoice_id) else self.name,
                         "LineItems": [
@@ -683,7 +757,8 @@ class Invoice(models.Model):
                                 "Quantity": qty,
                                 "UnitAmount": price,
                                 'ItemCode': single_line.product_id.default_code,
-                                "AccountCode": account_code
+                                "AccountCode": account_code,
+                                "Tracking": Tracking_list
                             }
                         ],
                         "Status": status
@@ -707,7 +782,8 @@ class Invoice(models.Model):
                             "Type": type,
                             "LineAmountTypes": tax_state,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "CreditNoteNumber": self.xero_invoice_number if (
                                     self.xero_invoice_number and self.xero_invoice_id) else self.name,
                             "LineItems": [
@@ -716,7 +792,8 @@ class Invoice(models.Model):
                                     "Quantity": qty,
                                     "UnitAmount": price,
                                     "AccountCode": account_code,
-                                    "TaxType": tax
+                                    "TaxType": tax,
+                                    "Tracking": Tracking_list
                                 }
                             ],
                             "Status": status
@@ -728,7 +805,8 @@ class Invoice(models.Model):
                         },
                         "Type": type,
                         "DueDate": str(self.invoice_date_due),
-                        "Date": str(self.invoice_date),
+                        # "Date": str(self.invoice_date),
+                        "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                         "CreditNoteNumber": self.xero_invoice_number if (
                                 self.xero_invoice_number and self.xero_invoice_id) else self.name,
                         "LineItems": [
@@ -736,7 +814,8 @@ class Invoice(models.Model):
                                 "Description": single_line.name,
                                 "Quantity": qty,
                                 "UnitAmount": price,
-                                "AccountCode": account_code
+                                "AccountCode": account_code,
+                                "Tracking": Tracking_list
                             }
                         ],
                         "Status": status
@@ -750,8 +829,7 @@ class Invoice(models.Model):
                     if line.product_id.xero_product_id:
                         _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                     elif not line.product_id.xero_product_id:
-                        self.env['product.product'].get_xero_product_ref(
-                            line.product_id)
+                        self.env['product.product'].get_xero_product_ref(line.product_id)
 
                 line_vals = self.prepare_credit_note_export_line_dict(line)
                 lst_line.append(line_vals)
@@ -760,7 +838,8 @@ class Invoice(models.Model):
                 "LineAmountTypes": tax_state,
                 "Contact": {"ContactID": cust_id},
                 "DueDate": str(self.invoice_date_due),
-                "Date": str(self.invoice_date),
+                # "Date": str(self.invoice_date),
+                "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                 "CreditNoteNumber": self.xero_invoice_number if (
                         self.xero_invoice_number and self.xero_invoice_id) else self.name,
                 "Status": status,
@@ -773,20 +852,30 @@ class Invoice(models.Model):
         if self.currency_id:
             currency_code = self.currency_id.name
             vals.update({"CurrencyCode": currency_code})
+        if self.currency_id != company.currency_id:
+            date = self.date if company.invoice_bill_accounting_date else self.invoice_date
+            currency_rates = self.currency_id.rate_ids.filtered(lambda rate: date >= rate.name)
+            if currency_rates:
+                currency_rates = max(currency_rates).company_rate
+            else:
+                currency_rates = 1
+            vals["CurrencyRate"] = currency_rates
+        # # Filter currency rates based on the given date
+        # currency_rates = self.currency_id.rate_ids.filtered(lambda rate: self.invoice_date == rate.name)
+        # # If currency rate is found, update the vals dictionary
+        # if currency_rates:
+        #     vals["CurrencyRate"] = currency_rates[0].company_rate
 
         return vals
 
     @api.model
     def prepare_vendorbill_export_dict(self):
-        company = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        company = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
 
-        if self.partner_id:
-            cust_id = self.env['res.partner'].get_xero_partner_ref(
-                self.partner_id)
+        if self.env.user.company_id.export_bill_parent_contact and self.partner_id.parent_id:
+            cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id.parent_id)
         else:
-            cust_id = self.env['res.partner'].get_xero_partner_ref(
-                self.partner_id)
+            cust_id = self.env['res.partner'].get_xero_partner_ref(self.partner_id)
 
         vals = {}
         lst_line = []
@@ -831,6 +920,16 @@ class Invoice(models.Model):
         if len(self.invoice_line_ids) == 1:
             single_line = self.invoice_line_ids
 
+            Tracking_list = []
+            if single_line.analytic_distribution:
+                for analytic_dist_id in single_line.analytic_distribution:
+                    analytic_account_id = self.env['account.analytic.account'].search(
+                        [('id', '=', analytic_dist_id)])
+                    analytic_account_id.create_analytic_account_in_xero(
+                        account_id=analytic_account_id.id)
+                    Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                          'Option': analytic_account_id.name})
+
             if single_line.quantity < 0:
                 qty = -single_line.quantity
                 price = -single_line.price_unit
@@ -839,11 +938,20 @@ class Invoice(models.Model):
                 price = single_line.price_unit
 
             if single_line.account_id:
-                if single_line.account_id.xero_account_id:
+                if single_line.product_id.detailed_type == 'product':
+                    if company.non_tracked_item:
+                        account_code = single_line.account_id.code
+                    elif company.export_bill_without_product:
+                        account_code = single_line.account_id.code
+                    else:
+                        account_code = single_line.product_id.categ_id.xero_inventory_account.code
+                    if not company.non_tracked_item:
+                        if not account_code:
+                            raise UserError(_("Please Set XERO Inventory Account Field In Product Category "))
+                elif single_line.account_id.xero_account_id:
                     account_code = single_line.account_id.code
                 else:
-                    self.env['account.account'].create_account_ref_in_xero(
-                        single_line.account_id)
+                    self.env['account.account'].create_account_ref_in_xero(single_line.account_id)
                     if single_line.account_id.xero_account_id:
                         account_code = single_line.account_id.code
 
@@ -851,8 +959,7 @@ class Invoice(models.Model):
                 if single_line.product_id.xero_product_id:
                     _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                 elif not single_line.product_id.xero_product_id:
-                    self.env['product.product'].get_xero_product_ref(
-                        single_line.product_id)
+                    self.env['product.product'].get_xero_product_ref(single_line.product_id)
 
                 if single_line.tax_ids:
                     line_tax = self.env['account.tax'].search(
@@ -865,6 +972,7 @@ class Invoice(models.Model):
                                 [('id', '=', single_line.tax_ids.id), ('company_id', '=', company.id)])
                             tax = line_tax.xero_tax_type_id
 
+
                         vals.update({
                             "Contact": {
                                 "ContactID": cust_id
@@ -872,7 +980,8 @@ class Invoice(models.Model):
                             "Type": type,
                             "LineAmountTypes": tax_state,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "InvoiceNumber": reference,
                             "LineItems": [
                                 {
@@ -881,7 +990,8 @@ class Invoice(models.Model):
                                     "UnitAmount": price,
                                     'ItemCode': single_line.product_id.default_code,
                                     "AccountCode": account_code,
-                                    "TaxType": tax
+                                    "TaxType": tax,
+                                    "Tracking": Tracking_list
                                 }
                             ],
                             "Status": status
@@ -894,7 +1004,8 @@ class Invoice(models.Model):
                         "Type": type,
                         "LineAmountTypes": tax_state,
                         "DueDate": str(self.invoice_date_due),
-                        "Date": str(self.invoice_date),
+                        # "Date": str(self.invoice_date),
+                        "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                         "InvoiceNumber": reference,
                         "LineItems": [
                             {
@@ -902,7 +1013,8 @@ class Invoice(models.Model):
                                 "Quantity": qty,
                                 "UnitAmount": price,
                                 'ItemCode': single_line.product_id.default_code,
-                                "AccountCode": account_code
+                                "AccountCode": account_code,
+                                "Tracking": Tracking_list
                             }
                         ],
                         "Status": status
@@ -926,7 +1038,8 @@ class Invoice(models.Model):
                             "Type": type,
                             "LineAmountTypes": tax_state,
                             "DueDate": str(self.invoice_date_due),
-                            "Date": str(self.invoice_date),
+                            # "Date": str(self.invoice_date),
+                            "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                             "InvoiceNumber": reference,
                             "LineItems": [
                                 {
@@ -934,7 +1047,8 @@ class Invoice(models.Model):
                                     "Quantity": qty,
                                     "UnitAmount": price,
                                     "AccountCode": account_code,
-                                    "TaxType": tax
+                                    "TaxType": tax,
+                                    "Tracking": Tracking_list
                                 }
                             ],
                             "Status": status
@@ -945,15 +1059,18 @@ class Invoice(models.Model):
                             "ContactID": cust_id
                         },
                         "Type": type,
+                        "LineAmountTypes": tax_state,
                         "DueDate": str(self.invoice_date_due),
-                        "Date": str(self.invoice_date),
+                        # "Date": str(self.invoice_date),
+                        "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                         "InvoiceNumber": reference,
                         "LineItems": [
                             {
                                 "Description": single_line.name,
                                 "Quantity": qty,
                                 "UnitAmount": price,
-                                "AccountCode": account_code
+                                "AccountCode": account_code,
+                                "Tracking": Tracking_list
                             }
                         ],
                         "Status": status
@@ -965,8 +1082,7 @@ class Invoice(models.Model):
                     if line.product_id.xero_product_id:
                         _logger.info(_("PRODUCT DEFAULT CODE AVAILABLE"))
                     elif not line.product_id.xero_product_id:
-                        self.env['product.product'].get_xero_product_ref(
-                            line.product_id)
+                        self.env['product.product'].get_xero_product_ref(line.product_id)
 
                 line_vals = self.prepare_credit_note_export_line_dict(line)
                 lst_line.append(line_vals)
@@ -975,7 +1091,8 @@ class Invoice(models.Model):
                 "LineAmountTypes": tax_state,
                 "Contact": {"ContactID": cust_id},
                 "DueDate": str(self.invoice_date_due),
-                "Date": str(self.invoice_date),
+                # "Date": str(self.invoice_date),
+                "Date": str(self.date if company.invoice_bill_accounting_date else self.invoice_date),
                 "InvoiceNumber": reference,
                 "Status": status,
                 "LineItems": lst_line,
@@ -983,6 +1100,21 @@ class Invoice(models.Model):
         if self.currency_id:
             currency_code = self.currency_id.name
             vals.update({"CurrencyCode": currency_code})
+        if self.currency_id != company.currency_id:
+            date = self.date if company.invoice_bill_accounting_date else self.invoice_date
+            currency_rates = self.currency_id.rate_ids.filtered(lambda rate: date >= rate.name)
+            if currency_rates:
+                currency_rates = max(currency_rates).company_rate
+            else:
+                currency_rates = 1
+            vals["CurrencyRate"] = currency_rates
+        # # Filter currency rates based on the given date
+        # currency_rates = self.currency_id.rate_ids.filtered(lambda rate: self.invoice_date == rate.name)
+        # # If currency rate is found, update the vals dictionary
+        # if currency_rates:
+        #     vals["CurrencyRate"] = currency_rates[0].company_rate
+
+
 
         return vals
 
@@ -990,42 +1122,48 @@ class Invoice(models.Model):
     def exportInvoice(self, payment_export=None):
         """export account invoice to QBO"""
         headers = self.get_head()
-        xero_config = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         if self._context.get('active_ids') and not payment_export:
             invoice = self.browse(self._context.get('active_ids'))
         else:
             invoice = self
 
         for t in invoice:
-            # print(t.move_type, 'Move type \n\n\n')
             if (t.move_type == 'out_refund') or (t.move_type == 'in_refund'):
                 self.exportCreditNote()
             elif (t.move_type == 'out_invoice') or (t.move_type == 'in_invoice'):
+                _logger.info(f'Export Bill/Invoice Data is------------>{t.name}')
                 if not t.xero_invoice_id:
                     if t.state == 'posted':
                         values = t.prepare_invoice_export_dict()
                         vals = self.remove_note_section(values)
                         parsed_dict = json.dumps(vals)
-                        _logger.info(
-                            "\n\nInvoice parsed_dict :   {} ".format(parsed_dict))
+                        _logger.info("\n\nInvoice parsed_dict :   {} ".format(parsed_dict))
                         url = 'https://api.xero.com/api.xro/2.0/Invoices?unitdp=4'
-                        data = requests.request(
-                            'POST', url=url, data=parsed_dict, headers=headers)
+                        data = requests.request('POST', url=url, data=parsed_dict, headers=headers)
 
-                        _logger.info("Response 1 From Server :{} {} ".format(
-                            data.status_code, data.text))  # ,data.text
+                        _logger.info("Response 1 From Server :{} {} ".format(data.status_code, data.text))  # ,data.text
 
                         if data.status_code == 200:
                             response_data = json.loads(data.text)
                             if response_data.get('Invoices'):
-                                t.xero_invoice_number = response_data.get(
-                                    'Invoices')[0].get('InvoiceNumber')
-                                t.xero_invoice_id = response_data.get(
-                                    'Invoices')[0].get('InvoiceID')
+                                t.xero_invoice_number = response_data.get('Invoices')[0].get('InvoiceNumber')
+                                t.xero_invoice_id = response_data.get('Invoices')[0].get('InvoiceID')
+                                if t.invoice_payment_term_id:
+                                    history_val = {
+                                        "HistoryRecords": [
+                                            {
+                                                "Details": f'Payment Term - {t.invoice_payment_term_id.name}'
+                                            },
+                                        ]
+                                    }
+                                    parsed_dict = json.dumps(history_val)
+                                    _logger.info("\n\nInvoice parsed_dict :   {} ".format(parsed_dict))
+                                    url = f'https://api.xero.com/api.xro/2.0/Invoices/{response_data.get("Invoices")[0].get("InvoiceID")}/history'
+                                    data = requests.request('POST', url=url, data=parsed_dict, headers=headers)
+
                                 self._cr.commit()
-                                _logger.info(
-                                    _("Exported successfully to XERO"))
+                                _logger.info(_("Exported successfully to XERO"))
                         elif data.status_code == 400:
                             logs = self.env['xero.error.log'].create({
                                 'transaction': 'Invoices Export',
@@ -1041,114 +1179,59 @@ class Invoice(models.Model):
                         else:
                             _logger.error(_('Something Went Wrong'))
 
+
                     else:
-                        raise ValidationError(
-                            _("Only Posted state Invoice is exported to Xero."))
+                        raise ValidationError(_("Only Posted state Invoice is exported to Xero."))
+
+
+
+                elif self._context.get('cron'):
+                    pass
                 else:
                     raise ValidationError(
                         _("%s Invoice is already exported to Xero. Please, export a different invoice." % t.name))
 
             elif t.move_type == 'entry':  # Manual Journal Entry
-                company = self.env.user.company_id
-                if company.skip_jnrl_entry:
-                    if t.line_ids and t.line_ids[0].product_id.categ_id:
-                        if not t.journal_id.id == t.line_ids[0].product_id.categ_id.property_stock_journal.id:
-                            if not t.xero_invoice_id:
-                                # print('\n\nNot Exported Yet\n\n')
-                                if t.state == 'posted':
-                                    # print('\n\nIs Posted\n\n')
-                                    values = t.prepare_manual_journal_export_dict()
-                                    parsed_dict = json.dumps(values)
+                _logger.info(f'Export Journal Entry Data is------------>{t.name}')
+                if not t.xero_invoice_id:
+                    if t.state == 'posted':
+                        values = t.prepare_manual_journal_export_dict()
+                        parsed_dict = json.dumps(values)
 
-                                    _logger.info(
-                                        "\n\nPrepared Dictionary :   {} ".format(parsed_dict))
+                        _logger.info("\n\nPrepared Dictionary :   {} ".format(parsed_dict))
 
-                                    url = 'https://api.xero.com/api.xro/2.0/ManualJournals'
-                                    data = requests.request(
-                                        'POST', url=url, data=parsed_dict, headers=headers)
-                                    _logger.info(
-                                        "Response 2 From Server :{} ".format(data.status_code, ))
+                        url = 'https://api.xero.com/api.xro/2.0/ManualJournals'
+                        data = requests.request('POST', url=url, data=parsed_dict, headers=headers)
+                        _logger.info("Response 2 From Server :{} ".format(data.status_code, ))
 
-                                    if data.status_code == 200:
-                                        response_data = json.loads(data.text)
-                                        # print('\n\nResponse : ', response_data)
+                        if data.status_code == 200:
+                            response_data = json.loads(data.text)
 
-                                        if response_data.get('ManualJournals'):
-                                            # t.xero_invoice_number = response_data.get('ManualJournals')[0].get('ManualJournalID')
-                                            t.xero_invoice_id = response_data.get(
-                                                'ManualJournals')[0].get('ManualJournalID')
-                                            self._cr.commit()
-                                            _logger.info(
-                                                _("Exported successfully to XERO"))
+                            if response_data.get('ManualJournals'):
+                                # t.xero_invoice_number = response_data.get('ManualJournals')[0].get('ManualJournalID')
+                                t.xero_invoice_id = response_data.get('ManualJournals')[0].get('ManualJournalID')
+                                self._cr.commit()
+                                _logger.info(_("Exported successfully to XERO"))
 
-                                    elif data.status_code == 400:
-                                        self._cr.commit()
-                                        self.show_error_message(data)
+                        elif data.status_code == 400:
+                            self._cr.commit()
+                            self.show_error_message(data)
 
-                                    elif data.status_code == 401:
-                                        raise ValidationError(
-                                            "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
-
-                                else:
-                                    raise ValidationError(
-                                        _("Only Posted state Invoice is exported to Xero."))
-                            else:
-                                raise ValidationError(
-                                    _("%s Manual Journal is already exported to Xero. Please, export a different Manual Journal." % t.name))
-
-
-                else:
-                    if t.line_ids and t.line_ids[0].product_id.categ_id:
-                        if not t.journal_id.id == t.line_ids[0].product_id.categ_id.property_stock_journal.id:
-                            if not t.xero_invoice_id:
-                                # print('\n\nNot Exported Yet\n\n')
-                                if t.state == 'posted':
-                                    # print('\n\nIs Posted\n\n')
-                                    values = t.prepare_manual_journal_export_dict()
-                                    parsed_dict = json.dumps(values)
-
-                                    _logger.info(
-                                        "\n\nPrepared Dictionary :   {} ".format(parsed_dict))
-
-                                    url = 'https://api.xero.com/api.xro/2.0/ManualJournals'
-                                    data = requests.request(
-                                        'POST', url=url, data=parsed_dict, headers=headers)
-                                    _logger.info(
-                                        "Response 2 From Server :{} ".format(data.status_code, ))
-
-                                    if data.status_code == 200:
-                                        response_data = json.loads(data.text)
-                                        # print('\n\nResponse : ', response_data)
-
-                                        if response_data.get('ManualJournals'):
-                                            # t.xero_invoice_number = response_data.get('ManualJournals')[0].get('ManualJournalID')
-                                            t.xero_invoice_id = response_data.get(
-                                                'ManualJournals')[0].get('ManualJournalID')
-                                            self._cr.commit()
-                                            _logger.info(
-                                                _("Exported successfully to XERO"))
-
-                                    elif data.status_code == 400:
-                                        self._cr.commit()
-                                        self.show_error_message(data)
-
-                                    elif data.status_code == 401:
-                                        raise ValidationError(
-                                            "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
-
-                                else:
-                                    raise ValidationError(
-                                        _("Only Posted state Invoice is exported to Xero."))
-                            else:
-                                raise ValidationError(
-                                    _("%s Manual Journal is already exported to Xero. Please, export a different Manual Journal." % t.name))
-
-                        else:
+                        elif data.status_code == 401:
                             raise ValidationError(
-                                _("This journal Entry can not be exported to QBO as you have skipped stock journal entries in Configuration."))
+                                "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
+                        
+                        elif data.status_code == 429:
+                                        raise ValidationError(
+                                            f"[429] you have made too many requests in a short period. Please wait a while before trying again.")
 
-        success_form = self.env.ref(
-            'pragmatic_odoo_xero_connector.export_successfull_view', False)
+                    else:
+                        raise ValidationError(_("Only Posted state Invoice is exported to Xero."))
+                else:
+                    raise ValidationError(
+                        _("%s Manual Journal is already exported to Xero. Please, export a different Manual Journal." % t.name))
+
+        success_form = self.env.ref('pragmatic_odoo_xero_connector.export_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -1186,6 +1269,7 @@ class Invoice(models.Model):
             for line in self.line_ids:
                 line_dict = {}
 
+                line_amount = 0
                 if line.credit > 0:
                     line_amount = -float(line.credit)
                 elif line.debit > 0:
@@ -1195,8 +1279,7 @@ class Invoice(models.Model):
                     if line.account_id.xero_account_id:
                         account_code = line.account_id.code
                     else:
-                        self.env['account.account'].create_account_ref_in_xero(
-                            line.account_id)
+                        self.env['account.account'].create_account_ref_in_xero(line.account_id)
                         if line.account_id.xero_account_id:
                             account_code = line.account_id.code
 
@@ -1212,15 +1295,13 @@ class Invoice(models.Model):
                     })
 
                 Tracking_list = []
-                Tracking_dict = {}
-
-                if line.analytic_account_id:
-                    group_id = line.analytic_account_id.mapped('group_id')
-                    line.analytic_account_id.create_analytic_account_in_xero(
-                        account_id=line.analytic_account_id.id)
-                    Tracking_dict.update({'Name': group_id.name,
-                                          'Option': line.analytic_account_id.name})
-                    Tracking_list.append(Tracking_dict)
+                if line.analytic_distribution:
+                    for analytic_dist_id in line.analytic_distribution:
+                        analytic_account_id = self.env['account.analytic.account'].search(
+                            [('id', '=', analytic_dist_id)])
+                        analytic_account_id.create_analytic_account_in_xero(account_id=analytic_account_id.id)
+                        Tracking_list.append({'Name': analytic_account_id.plan_id.name,
+                                              'Option': analytic_account_id.name})
 
                 line_dict.update({
                     'Tracking': Tracking_list
@@ -1237,19 +1318,18 @@ class Invoice(models.Model):
             "ShowOnCashBasisReports": "false"
         })
 
-        # print('\n\n\n Prepeared Dictionary : ', vals, '\n\n\n\n')
         return vals
 
     def remove_note_section(self, vals):
         if 'LineItems' in vals:
-            vals.get('LineItems')[:] = [item for item in vals.get(
-                'LineItems') if 'AccountCode' in item and item['AccountCode'] != None and item['Quantity'] != 0.0]
+            vals.get('LineItems')[:] = [item for item in vals.get('LineItems') if
+                                        'AccountCode' in item and item['AccountCode'] != None and item[
+                                            'Quantity'] != 0.0]
         return vals
 
     @api.model
     def exportCreditNote(self, payment_export=None):
-        xero_config = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         if self._context.get('active_ids') and not payment_export:
             invoice = self.browse(self._context.get('active_ids'))
         else:
@@ -1261,8 +1341,7 @@ class Invoice(models.Model):
                     values = t.prepare_credit_note_export_dict()
                     vals = self.remove_note_section(values)
                     parsed_dict = json.dumps(vals)
-                    _logger.info(
-                        _("PARSED DICT : %s %s" % (parsed_dict, type(parsed_dict))))
+                    _logger.info(_("PARSED DICT : %s %s" % (parsed_dict, type(parsed_dict))))
                     url = 'https://api.xero.com/api.xro/2.0/CreditNotes?unitdp=4'
                     data = self.post_data(url, parsed_dict)
                     _logger.info('Response From Server : {}'.format(data.text))
@@ -1272,13 +1351,25 @@ class Invoice(models.Model):
                         parsed_data = json.loads(data.text)
                         if parsed_data:
                             if parsed_data.get('CreditNotes'):
-                                t.xero_invoice_number = parsed_data.get(
-                                    'CreditNotes')[0].get('CreditNoteNumber')
+                                t.xero_invoice_number = parsed_data.get('CreditNotes')[0].get('CreditNoteNumber')
                                 t.xero_invoice_id = parsed_data.get(
                                     'CreditNotes')[0].get('CreditNoteID')
+
+                                if t.invoice_payment_term_id:
+                                    headers = self.get_head()
+                                    history_val = {
+                                        "HistoryRecords": [
+                                            {
+                                                "Details": f'Payment Term - {t.invoice_payment_term_id.name}'
+                                            },
+                                        ]
+                                    }
+                                    parsed_dict = json.dumps(history_val)
+                                    _logger.info("\n\nInvoice parsed_dict :   {} ".format(parsed_dict))
+                                    url = f'https://api.xero.com/api.xro/2.0/Creditnotes/{parsed_data.get("CreditNotes")[0].get("CreditNoteID")}/history'
+                                    data = requests.request('POST', url=url, data=parsed_dict, headers=headers)
                                 self._cr.commit()
-                                _logger.info(
-                                    _("(CREATE) Exported successfully to XERO"))
+                                _logger.info(_("(CREATE) Exported successfully to XERO"))
                     elif data.status_code == 400:
                         logs = self.env['xero.error.log'].create({
                             'transaction': 'CreditNote Export',
@@ -1292,14 +1383,12 @@ class Invoice(models.Model):
                         raise ValidationError(
                             "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
                 else:
-                    raise ValidationError(
-                        _("Only Posted state Credit Notes is exported to Xero."))
+                    raise ValidationError(_("Only Posted state Credit Notes is exported to Xero."))
             else:
                 raise ValidationError(_(
                     "%s Credit Notes is already exported to Xero. Please, export a different credit note." % t.name))
 
-        success_form = self.env.ref(
-            'pragmatic_odoo_xero_connector.export_successfull_view', False)
+        success_form = self.env.ref('pragmatic_odoo_xero_connector.export_successfull_view', False)
         return {
             'name': _('Notification'),
             'type': 'ir.actions.act_window',
@@ -1312,8 +1401,10 @@ class Invoice(models.Model):
         }
 
     def get_head(self):
-        xero_config = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        if self._context.get('cron'):
+            xero_config = self.company_id
+        else:
+            xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         client_id = xero_config.xero_client_id
         client_secret = xero_config.xero_client_secret
 
@@ -1329,8 +1420,7 @@ class Invoice(models.Model):
         return headers
 
     def post_data(self, url, parsed_dict):
-        xero_config = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
+        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
 
         if xero_config.xero_oauth_token:
             token = xero_config.xero_oauth_token
@@ -1343,8 +1433,7 @@ class Invoice(models.Model):
             resource_owner_secret = xero_config.xero_oauth_token_secret
 
             protected_url = url
-            data = requests.request(
-                'POST', url=protected_url, data=parsed_dict, headers=headers)
+            data = requests.request('POST', url=protected_url, data=parsed_dict, headers=headers)
         return data
 
     def show_error_message(self, data):
@@ -1366,13 +1455,78 @@ class Invoice(models.Model):
 
     @api.model
     def exportInvoice_cron(self):
-        xero_config = self.env['res.users'].search(
-            [('id', '=', self._uid)], limit=1).company_id
-        invoice_id = self.env['account.move'].search([('xero_invoice_id', '=', False),
-                                                      ('state', '=', 'posted'),
-                                                      ('date', '>', xero_config.export_record_after)])
-        for invoice in invoice_id:
-            invoice.exportInvoice()
+        companys = self.env['res.company'].search([])
+        self._context['cron'] = 1
+        for xero_config in companys:
+            if xero_config.xero_client_id and xero_config.xero_client_secret:
+                xero_config.refresh_token()
+                # invoice_id = self.env['account.move'].search(
+                #     ['|', '&', '&', ('invoice_date', '>', xero_config.export_record_after),
+                #      ('date', '>', xero_config.export_record_after),
+                #      ('xero_invoice_id', '=', False),
+                #      ('state', '=', 'posted'), ('company_id', '=', xero_config.id),
+                #      ])
+                invoice_id = self.env['account.move'].search(
+                    ['&', '&', ('invoice_date', '>', xero_config.export_record_after),
+                     ('xero_invoice_id', '=', False),
+                     ('state', '=', 'posted'), ('company_id', '=', xero_config.id),
+                     ])
+
+                if xero_config.skip_stock_journal_entry:
+                    operation_type_list = [operation_type.type for operation_type in
+                                           xero_config.operation_type_ids]
+
+                ref_string_list = []
+                if xero_config.skip_je_if_contains:
+                    ref_string_list = xero_config.skip_je_if_contains.split(',')
+            else:
+                continue
+
+            for invoice in invoice_id:
+                _logger.info(_(f"Export Invoice Or Journal Entry-----{invoice.id}"))
+                if not invoice.xero_invoice_id:
+                    if invoice.move_type == 'entry':
+                        if invoice.journal_id.type == 'general':
+                            if ref_string_list:
+                                list_skip = []
+                                for ref_string in ref_string_list:
+                                    pattern = r"\b" + re.escape(ref_string.lower()) + r"\b"
+                                    if re.search(pattern, invoice.ref.lower()):
+                                        list_skip.append('Match Entry')
+                                if not 'Match Entry' in list_skip:
+                                    if xero_config.skip_stock_journal_entry and invoice.ref:
+                                        try:
+                                            type_str = invoice.ref.split(" - ")[0].split("/")[1]
+                                        except:
+                                            type_str = False
+                                        if type_str:
+                                            if invoice.journal_id.id == xero_config.journal.id and type_str in operation_type_list:
+                                                pass
+                                            else:
+                                                invoice.exportInvoice()
+                                        else:
+                                            invoice.exportInvoice()
+                                    else:
+                                        invoice.exportInvoice()
+                                else:
+                                    _logger.info(f"Skip Quantity Update REf REcord for ID----{invoice.id}")
+                            else:
+                                if xero_config.skip_stock_journal_entry and invoice.ref:
+                                    try:
+                                        type_str = invoice.ref.split(" - ")[0].split("/")[1]
+                                    except:
+                                        type_str = False
+                                    if type_str:
+                                        if invoice.journal_id.id == xero_config.journal.id and type_str in operation_type_list:
+                                            pass
+                                        else:
+                                            invoice.exportInvoice()
+                                    else:
+                                        invoice.exportInvoice()
+                                else:
+                                    invoice.exportInvoice()
+                    else:
+                        invoice.exportInvoice()
 
 
 class InvoiceLine(models.Model):
@@ -1381,23 +1535,22 @@ class InvoiceLine(models.Model):
     xero_invoice_line_id = fields.Char(string="Xero Id", copy=False)
     inclusive = fields.Boolean('Inclusive', default=False, copy=False)
 
-    # @api.model_create_multi
-    # def create(self, vals_list):
-    #
-    #     lines = super(InvoiceLine, self).create(vals_list)
-    #     to_process = lines.filtered(lambda
-    #                                     line: line.move_id.journal_id.name == 'Vendor Bills' and line.product_id.type == 'product' and not line.xero_invoice_line_id)
-    #
-    #     # Nothing to process, break.
-    #     if not to_process:
-    #         return lines
-    #
-    #     company_id = self.env['res.users'].search(
-    #         [('id', '=', self._uid)], limit=1).company_id
-    #     for inv_line in to_process:
-    #         if not company_id.set_expence_account_for_bill:
-    #             if not inv_line.product_id.categ_id.xero_inventory_account:
-    #                 raise UserError(
-    #                     _("Please Set XERO Inventory Account Field In Product Category "))
-    #             inv_line.account_id = inv_line.product_id.categ_id.xero_inventory_account
-    #     return lines
+    @api.model_create_multi
+    def create(self, vals_list):
+
+        lines = super(InvoiceLine, self).create(vals_list)
+        to_process = lines.filtered(lambda
+                                        line: line.move_id.journal_id.name == 'Vendor Bills' and line.product_id.type == 'product' and not line.xero_invoice_line_id)
+        print("to_processto_process",to_process)
+
+        # Nothing to process, break.
+        if not to_process:
+            return lines
+
+        company_id = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        if not company_id.non_tracked_item:
+            for inv_line in to_process:
+                if not inv_line.product_id.categ_id.xero_inventory_account:
+                    raise UserError(_("Please Set XERO Inventory Account Field In Product Category "))
+                # inv_line.account_id = inv_line.product_id.categ_id.xero_inventory_account
+        return lines

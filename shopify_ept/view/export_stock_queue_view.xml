@@ -13,20 +13,20 @@
                             name="%(shopify_ept.action_sync_export_stock_queue)d"
                             string="Process Queue" type="action"/>
                 </header>
-                <field name="name"/>
+                <field name="name" context='{"dashboard_model": "shopify.export.stock.queue.ept", "queue_line_model": "shopify.export.stock.queue.line.ept"}'/>
                 <field name="shopify_instance_id"/>
                 <field name="create_date"/>
                 <field name="state" decoration-success="state == 'completed'" decoration-info="state == 'draft'"
                        decoration-warning="state == 'partially_completed'" decoration-danger="state == 'failed'"
                        widget="badge"/>
                 <field name="is_action_require" invisible="1"/>
-                <button string="Need manual interaction"
+                <button title="Need manual interaction"
                         icon="fa-exclamation-triangle text-danger"
-                        attrs="{'invisible': ['|',('is_action_require','=',False),('state','=','done')]}"
+                        invisible="not is_action_require or state == 'completed'"
                         special="cancel"/>
                 <field name="is_process_queue" invisible="1"/>
                 <field name="running_status"
-                       attrs="{'invisible':[('is_process_queue', '=', False)]}"/>
+                       invisible="not is_process_queue"/>
                 <field name="activity_ids" widget="list_activity"/>
             </tree>
         </field>
@@ -43,17 +43,17 @@
                     <button
                             name="%(shopify_ept.action_sync_export_stock_queue)d"
                             string="Process Queue Manually" type="action" class="btn-primary"
-                            attrs="{'invisible':['|',('is_process_queue', '=', True),('state','in',('completed'))]}"/>
+                            invisible="is_process_queue or state in ('completed')"/>
                     <button
                             name="%(shopify_ept.action_wizard_set_to_completed_stock_export)d"
                             string="Set To Completed" type="action" class="btn-primary"
-                            attrs="{'invisible':['|',('is_process_queue', '=', True),('state','in',('completed'))]}"/>
+                            invisible="is_process_queue or state in ('completed')"/>
                     <field name="state" widget="statusbar"/>
                     <field name="is_process_queue" invisible="1"/>
                 </header>
                 <div class="alert alert-danger" role="alert"
                      style="margin-bottom:0px;"
-                     attrs="{'invisible': ['|',('is_action_require','=',False),('state','=','completed')]}">
+                     invisible="not is_action_require or state == 'completed'">
                     <strong>
                         - Need to process this queue manually.
                         There are 3 attempts been made by automated action to process this queue,
@@ -82,7 +82,7 @@
                             </div>
                         </button>
                         <button id="queue_line_fail" class="oe_stat_button" icon="fa-times" disabled="1"
-                                attrs="{'invisible':[('state', 'in', ['partially_completed'])]}">
+                                invisible="state in ['partially_completed']">
                             <div class="o_field_widget o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="queue_line_fail_records"/>
@@ -91,7 +91,7 @@
                             </div>
                         </button>
                         <button id="queue_line_fail_sub" class="oe_stat_button" disabled="1"
-                                attrs="{'invisible':[('state', 'not in', ['partially_completed'])]}">
+                                invisible="state not in ['partially_completed']">
                             <span class="fa-stack fa-lg"
                                   style="padding-top: 6px; margin-left:2px; margin-top:2PX; font-size: 22px; color:#ff0000;">
                                 <i class="fa fa-times-circle" title="Time Circle"
@@ -101,7 +101,7 @@
                                    string="Failed"/>
                         </button>
                         <button id="queue_line_done" class="oe_stat_button" icon="fa-check" disabled="1"
-                                attrs="{'invisible':[('state', 'in', ['completed'])]}">
+                                invisible="state in ['completed']">
                             <div class="o_field_widget o_stat_info">
                                 <span class="o_stat_value">
                                     <field name="queue_line_done_records"/>
@@ -110,7 +110,7 @@
                             </div>
                         </button>
                         <button id="queue_line_done_sub" class="oe_stat_button" disabled="1"
-                                attrs="{'invisible':[('state', 'not in', ['completed'])]}">
+                                invisible="state not in ['completed']">
                             <span class="fa-stack fa-lg"
                                   style="padding-top: 6px; margin-left:15px; color:#00ff00;">
                                 <i class="fa fa-check fa-stack-1x" style="margin-left:4px;"
@@ -133,16 +133,13 @@
                         </button>
                     </div>
                     <widget name="web_ribbon" text="Processed"
-                            attrs="{'invisible': [('state','!=','completed')]}"/>
+                            invisible="state != 'completed'"/>
                     <widget name="web_ribbon" text="Processing..."
-                            attrs="{'invisible':[('is_process_queue', '=', False)]}"/>
-                    <div class="oe_left" style="width: 500px;">
-                        <div class="oe_title" style="width: 390px;">
-                            <label class="oe_edit_only" for="name" string="Name"/>
-                            <h1>
-                                <field name="name" class="oe_inline" readonly="1"/>
-                            </h1>
-                        </div>
+                            invisible="not is_process_queue"/>
+                    <div>
+                        <h1>
+                            <field name="name"/>
+                        </h1>
                     </div>
                     <group name="shopify_instance_id">
                         <group>
@@ -151,15 +148,11 @@
                             <field name="queue_process_count" invisible="1"/>
                             <field name="is_action_require" invisible="1"/>
                         </group>
-                        <group>
-                            <field name="common_log_book_id" string="Log Book"
-                                   readonly="1"/>
-                        </group>
                     </group>
                     <notebook>
                         <page string="Export Stock Queue line">
                             <field name="export_stock_queue_line_ids" readonly="True">
-                                <tree create="false" editable="bottom"
+                                <tree create="false"
                                       decoration-danger="state=='failed'"
                                       decoration-success="state=='done'"
                                       decoration-info="state=='draft'">
@@ -174,7 +167,7 @@
                         </page>
                         <page string="Log Lines">
                             <field name="common_log_lines_ids">
-                                <tree create="false" editable="bottom">
+                                <tree create="false">
                                     <field name="shopify_export_stock_queue_line_id"/>
                                     <field name="message"/>
                                 </tree>

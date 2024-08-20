@@ -176,8 +176,7 @@ class Account(models.Model):
                                         for err in element.get('ValidationErrors'):
                                             if err.get('Message'):
                                                 raise ValidationError(
-                                                    '(Account) Xero Exception : ' + err.get(
-                                                        'Message') + '\nExported Data: ' + str(parsed_dict))
+                                                    '(Account) Xero Exception : ' + err.get('Message')+'\nExported Data: '+str(parsed_dict))
                             elif response_data.get('Message'):
                                 raise ValidationError(
                                     '(Account) Xero Exception : ' + response_data.get('Message'))
@@ -224,7 +223,7 @@ class XeroAccountType(models.Model):
     _description = 'xero account account'
     _rec_name = 'xero_account_type_name'
 
-    xero_account_type_name = fields.Char(string='Account Type', readonly=True, copy=False)
+    xero_account_type_name = fields.Char(string='Account Type', copy=False)
 
 
 class XeroAccountTaxType(models.Model):
@@ -232,11 +231,11 @@ class XeroAccountTaxType(models.Model):
     _description = 'xero tax type'
     _rec_name = 'xero_tax_type'
 
-    xero_tax_type = fields.Char(string='Account Tax Type', readonly=True, copy=False)
+    xero_tax_type = fields.Char(string='Account Tax Type', copy=False)
 
 
 class AnalyticAccountGroupsInherit(models.Model):
-    _inherit = 'account.analytic.group'
+    _inherit = 'account.analytic.plan'
 
     xero_tracking_id = fields.Char(string="Xero Tracking Id", copy=False)
     is_active = fields.Boolean(string="Active", default=True)
@@ -302,8 +301,8 @@ class AnalyticAccountGroupsInherit(models.Model):
                         msg = Error[0].get('ValidationErrors')
                         msg = msg[0].get('Message')
 
-                        _logger.info(_("\n\n\n Error \n %s\n\n" % msg))
-                        raise ValidationError(_('%s' % msg))
+                        _logger.info(_("\n\n\n Error \n %s\n\n" %msg))
+                        raise ValidationError(_('%s'%msg))
 
                 elif data.status_code == 401:
                     raise ValidationError('Please refresh token first')
@@ -330,7 +329,6 @@ class AnalyticAccountGroupsInherit(models.Model):
 class AnalyticAccountInherit(models.Model):
     _inherit = 'account.analytic.account'
 
-    # xero_tracking_id = fields.Char(string="Xero Tracking Id", copy=False)
     xero_tracking_opt_id = fields.Char(string="Xero Tracking Id", copy=False)
     is_active = fields.Boolean(string="Is Active", default=True)
 
@@ -343,6 +341,7 @@ class AnalyticAccountInherit(models.Model):
         else:
             account = self.env['account.analytic.account'].browse(account_id)
 
+
         for t in account:
             vals = {}
             if t.is_active:
@@ -351,11 +350,11 @@ class AnalyticAccountInherit(models.Model):
                 status = "ARCHIVED"
 
             if not t.xero_tracking_opt_id:
-                if t.group_id:
+                if t.plan_id:
                     groupTrackingId = None
-                    obj = self.env['account.analytic.group'].search([('id', '=', t.group_id.id)])
+                    obj = self.env['account.analytic.plan'].search([('id', '=', t.plan_id.id)])
                     if not obj.xero_tracking_id:
-                        groupTrackingId = obj.create_analytic_account_group_in_xero(t.group_id)
+                        groupTrackingId = obj.create_analytic_account_group_in_xero(t.plan_id)
 
                     if not groupTrackingId:
                         groupTrackingId = obj.xero_tracking_id
@@ -380,8 +379,8 @@ class AnalyticAccountInherit(models.Model):
                 else:
                     raise ValidationError(_('Please Assign group for %s' % t.name))
             else:
-                if t.group_id:
-                    obj = self.env['account.analytic.group'].search([('id', '=', t.group_id.id)])
+                if t.plan_id:
+                    obj = self.env['account.analytic.plan'].search([('id', '=', t.plan_id.id)])
                     vals.update({'Name': t.name, 'Status': status})
                     parsed_dict = json.dumps(vals)
                     url = 'https://api.xero.com/api.xro/2.0/TrackingCategories/{}/Options/{}'.format(
@@ -400,9 +399,3 @@ class AnalyticAccountInherit(models.Model):
                             _logger.info(_("\n\n\n Error \n %s\n\n" % msg))
                             raise ValidationError(_('%s' % msg))
 
-
-class AnalyticAccountTagInherit(models.Model):
-    _inherit = 'account.analytic.tag'
-
-    xero_tracking_opt_id = fields.Char(string="XERO Tracking Option ID", copy=False)
-    company_id = fields.Many2one(default=lambda self: self.env.company)

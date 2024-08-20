@@ -18,11 +18,11 @@ class MrpProduction(models.Model):
     reference = fields.Selection([('a', 'A'), ('b', 'B'), ('c', 'C')], string="Reference")
     planned_week = fields.Char("Planned Week", compute='_calculate_week_of_planned_date', store=True)
 
-    @api.depends('date_planned_start')
+    @api.depends('date_start')
     def _calculate_week_of_planned_date(self):
         for rec in self:
-            if rec.date_planned_start:
-                rec.planned_week = rec.date_planned_start.strftime("%V")
+            if rec.date_start:
+                rec.planned_week = rec.date_start.strftime("%V")
 
     def action_spilt(self):
         self.ensure_one()
@@ -80,7 +80,7 @@ class MrpProduction(models.Model):
         while remaining_qty > unit_per_mo or remaining_qty > 0:
             product_qty = unit_per_mo if remaining_qty > unit_per_mo else remaining_qty
             remaining_qty -= unit_per_mo
-            order = self.copy({'product_qty': product_qty, 'date_planned_start': self.date_planned_start})
+            order = self.copy({'product_qty': product_qty, 'date_start': self.date_start})
             order._onchange_product_qty()
             order._onchange_move_raw()
             order._onchange_move_finished()
@@ -122,14 +122,14 @@ class MrpProduction(models.Model):
         # Schedule all work orders (new ones and those already created)
         qty_to_produce = max(self.product_qty - self.qty_produced, 0)
         qty_to_produce = self.product_uom_id._compute_quantity(qty_to_produce, self.product_id.uom_id)
-        start_date = max(self.date_planned_start, datetime.datetime.now())
+        start_date = max(self.date_start, datetime.datetime.now())
         if replan:
             workorder_ids = self.workorder_ids.filtered(lambda wo: wo.state in ('pending', 'waiting', 'ready'))
-            # We plan the manufacturing order according to its `date_planned_start`, but if
-            # `date_planned_start` is in the past, we plan it as soon as possible.
+            # We plan the manufacturing order according to its `date_start`, but if
+            # `date_start` is in the past, we plan it as soon as possible.
             workorder_ids.leave_id.unlink()
         else:
-            workorder_ids = self.workorder_ids.filtered(lambda wo: not wo.date_planned_start)
+            workorder_ids = self.workorder_ids.filtered(lambda wo: not wo.date_start)
         for workorder in workorder_ids:
             # If product contains alternative sewing teams then use those as alternative workcenters
             if workorder.operation_id.sewing_operation and workorder.product_id.sewing_teams:
@@ -165,8 +165,11 @@ class MrpProduction(models.Model):
                 raise UserError(_('Impossible to plan the workorder. Please check the workcenter availabilities.'))
 
             # Instantiate start_date for the next workorder planning
-            if workorder.next_work_order_id:
+            # if workorder.next_work_order_id:
+            #     start_date = best_finished_date
+            if workorder.needed_by_workorder_ids:
                 start_date = best_finished_date
+
 
             # Create leave on chosen workcenter calendar
             leave = self.env['resource.calendar.leaves'].create({
@@ -180,8 +183,8 @@ class MrpProduction(models.Model):
             vals['leave_id'] = leave.id
             workorder.write(vals)
         self.with_context(force_date=True).write({
-            'date_planned_start': self.workorder_ids[0].date_planned_start,
-            'date_planned_finished': self.workorder_ids[-1].date_planned_finished
+            'date_start': self.workorder_ids[0].date_start,
+            'date_finished': self.workorder_ids[-1].date_finished
         })
 
     MrpProduction._plan_workorders = _plan_workorders

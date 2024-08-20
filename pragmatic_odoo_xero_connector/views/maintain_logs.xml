@@ -48,5 +48,5 @@
 
    	<menuitem action="action_xero_error_log_form" id="menu_action_xero_error_logs_form_sale" parent="sale.sale_menu_root"/>
 	<menuitem action="action_xero_error_log_form" id="menu_action_xero_error_logs_form_purchase" parent="purchase.menu_purchase_root"/>
-	<menuitem action="action_xero_error_log_form" id="menu_action_xero_error_logs_form_invoice" parent="account.menu_finance"/>
+	<!-- <menuitem action="action_xero_error_log_form" id="menu_action_xero_error_logs_form_invoice" parent="account.menu_finance"/> -->
 </odoo>

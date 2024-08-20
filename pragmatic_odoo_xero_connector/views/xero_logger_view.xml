@@ -42,6 +42,8 @@
             <field name="view_mode">tree,form</field>
         </record>
 
-        <menuitem id="menu_xero_import_export_logger" parent="menu_xero_odoo_connector" name="Logs" action="action_xero_import_export_record" sequence="20"/>
+        <menuitem id="menu_xero_import_export_logger" parent="menu_xero_odoo_connector" name="Spend/Receive Logs" action="action_xero_import_export_record" sequence="20"/>
+        <menuitem action="action_xero_error_log_form" id="menu_action_xero_error_logs_form_invoice" parent="menu_xero_odoo_connector" sequence="21"/>
+
     </data>
 </odoo>

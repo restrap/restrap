@@ -9,12 +9,13 @@
                 <field name="allow_mrp_split" invisible="1"/>
                 <field name="mrp_split_done" invisible="1"/>
                 <button name="%(action_confirm_mo_spilt_wizard)d" type="action" string="Split" class="oe_highlight"
-                        attrs="{'invisible': ['|', '|', ('state', '!=', 'draft'), ('allow_mrp_split', '=', False), ('mrp_split_done', '=', True)]}"/>
+                        invisible="state != 'draft' or allow_mrp_split == False or mrp_split_done == True"/>
+
             </xpath>
             <xpath expr="//field[@name='user_id']" position="after">
-                <field name="reference" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                <field name="reference" readonly="state != 'draft'"/>
             </xpath>
-            <xpath expr="//field[@name='date_planned_start']" position="after">
+            <xpath expr="//field[@name='date_start']" position="after">
                 <field name="planned_week" invisible="1"/>
             </xpath>
         </field>

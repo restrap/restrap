@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-    <data>
+    <data noupdate="1">
 <!--        Server action for exporting quotations from odoo to xero-->
         <record model="ir.actions.server" id="export_quotation_to_xero">
             <field name="name">Export to XERO</field>

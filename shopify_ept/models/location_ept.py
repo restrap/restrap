@@ -13,18 +13,18 @@ class ShopifyLocationEpt(models.Model):
 
     name = fields.Char(help="Give this location a short name to make it easy to identify. You’ll see this name in areas"
                             "like orders and products.",
-                       readonly="1")
+                       readonly=True)
     export_stock_warehouse_ids = fields.Many2many('stock.warehouse', string='Warehouses',
                                                   help="Selected warehouse used while Export the stock.")
     import_stock_warehouse_id = fields.Many2one('stock.warehouse', string='Warehouse',
                                                 help="Selected warehouse used while Import the stock.")
-    shopify_location_id = fields.Char(readonly="1")
-    instance_id = fields.Many2one('shopify.instance.ept', "Instance", readonly="1", ondelete="cascade")
+    shopify_location_id = fields.Char(readonly=True)
+    instance_id = fields.Many2one('shopify.instance.ept', "Instance", readonly=True, ondelete="cascade")
     legacy = fields.Boolean('Is Legacy Location', help="Whether this is a fulfillment service location. If true, then"
                                                        "the location is a fulfillment service location. If false, then"
                                                        "the location was created by the merchant and isn't tied to a"
-                                                       "fulfillment service.", readonly="1")
-    is_primary_location = fields.Boolean(readonly="1")
+                                                       "fulfillment service.", readonly=True)
+    is_primary_location = fields.Boolean(readonly=True)
     shopify_instance_company_id = fields.Many2one('res.company', string='Company', readonly=True)
     warehouse_for_order = fields.Many2one('stock.warehouse', "Warehouse in Order",
                                           help="The warehouse to set while importing order, if this"

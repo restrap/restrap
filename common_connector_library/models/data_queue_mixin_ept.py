@@ -9,12 +9,12 @@ class DataQueueMixinEpt(models.AbstractModel):
     _description = 'Data Queue Mixin'
 
     def delete_data_queue_ept(self, queue_detail=[], is_delete_queue=False):
-        """  Uses to delete unused data of queues and log book. logbook deletes which created before 7 days ago.
-            @param queue_detail: list of queue records, like product, order queue [['product_queue',
-            'order_queue']]
-            @param is_delete_queue: Identification to delete queue
-            @author: Dipak Gogiya
-            Migration done by Haresh Mori on September 2021
+        """
+        Define this method for delete unused data of queues and log book. logbook deletes
+        which created before 7 days ago.
+        :param: queue_detail: list of queue records, like product, order queue [['product_queue', 'order_queue']]
+        :param: is_delete_queue: True/False
+        :return: True
         """
         if queue_detail:
             try:

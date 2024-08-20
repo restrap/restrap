@@ -1,10 +1,9 @@
-odoo.define('restrap.field_utils', function (require) {
-    "use strict";
+/** @odoo-module **/
 
-var core = require('web.core');
-var field_utils = require('web.field_utils');
-var utils = require('web.utils');
-var session = require('web.session');
+import { registry } from "@web/core/registry";
+import { formatFloat as originalFormatFloat, humanNumber, insertThousandSeparators } from "@web/core/utils/numbers";
+import { FloatField } from "@web/views/fields/float/float_field";
+import { patch } from "@web/core/utils/patch";
 
 function formatFloat(value, field, options) {
     options = options || {};
@@ -12,10 +11,10 @@ function formatFloat(value, field, options) {
         return "";
     }
     if (options.humanReadable && options.humanReadable(value)) {
-        return utils.human_number(value, options.decimals, options.minDigits, options.formatterCallback);
+        return humanNumber(value, options.decimals, options.minDigits, options.formatterCallback);
     }
-    var l10n = core._t.database.parameters;
-    var precision;
+    const l10n = registry.category("database.parameters").current;
+    let precision;
     if (options.digits) {
         precision = options.digits[1];
     } else if (field && field.digits) {
@@ -23,21 +22,20 @@ function formatFloat(value, field, options) {
     } else {
         precision = 2;
     }
-    var formatted = _.str.sprintf('%.' + precision + 'f', value || 0).split('.');
-    formatted[0] = utils.insert_thousand_seps(formatted[0]);
+    const formatted = _.str.sprintf('%.' + precision + 'f', value || 0).split('.');
+    formatted[0] = insertThousandSeparators(formatted[0]);
 
-    if (field){
-        if (field.name == 'product_uom_qty' || field.name == 'qty_delivered' || field.name == 'qty_invoiced'
-            || field.name == 'qty_to_invoice' || field.name == 'product_qty' || field.name == 'quantity'){
-            return formatted.join(l10n.decimal_point).replace(/0+$/g, "").replace(/[.]$/,"");
-        }
-        else {
+    if (field) {
+        if (['product_uom_qty', 'qty_delivered', 'qty_invoiced', 'qty_to_invoice', 'product_qty', 'quantity'].includes(field.name)) {
+            return formatted.join(l10n.decimal_point).replace(/0+$/g, "").replace(/[.]$/, "");
+        } else {
             return formatted.join(l10n.decimal_point);
         }
     }
-
 }
 
-field_utils.format.float = formatFloat;
-
+patch(FloatField.prototype, {
+    formatFloat: formatFloat
 });
+
+export { formatFloat };

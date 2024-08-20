@@ -42,7 +42,7 @@ class SaleOrderMergeWizard(models.TransientModel):
     def action_confirm(self):
         plan_id = self.env['restrap.mrp.plan'].sudo().create({}).id
         for line in self.line_ids:
-            if not line.date_planned_start:
+            if not line.date_start:
                 raise UserError("Please add scheduled date.")
             product_id = line.product_id
             order = self.env['mrp.production'].create({

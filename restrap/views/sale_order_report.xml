@@ -17,16 +17,19 @@
         </xpath>
     </template>
 
-    <template id="document_tax_totals_sales" inherit_id="account.document_tax_totals" name="document_tax_totals_restrap_sales">
-        <!-- Add total units to totals table -->
-        <xpath expr="//t[@t-as='subtotal']" position="before">
+  <odoo>
+    <template id="document_tax_totals_template" inherit_id="account.document_tax_totals_template">
+        <xpath expr="//t[@t-foreach]" position="before" >
+<!--        <xpath expr="//t[@t-foreach='tax_totals['subtotals']']" position="before">-->
             <tr t-if="doc and doc._name == 'sale.order'" class="border-black o_total">
                 <td><strong>Total Units</strong></td>
-                <td class="text-right">
+                <td class="text-end">
                     <span t-field="doc.total_qty"/>
                 </td>
             </tr>
         </xpath>
     </template>
+</odoo>
+
 
 </odoo>

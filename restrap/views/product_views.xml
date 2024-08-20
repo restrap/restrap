@@ -8,10 +8,11 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='barcode']" position="after">
                 <field name="sewing_teams" widget="many2many_tags" domain="[('name', 'like', 'Sewing')]" />
-            </xpath>
-            <xpath expr="//field[@name='hs_code']" position="after">
                 <field name="origin_country_id" options="{'no_create': 1}"/>
             </xpath>
+<!--            <xpath expr="//field[@name='hs_code']" position="after">-->
+<!--                <field name="origin_country_id" options="{'no_create': 1}"/>-->
+<!--            </xpath>-->
         </field>
     </record>
 
@@ -22,10 +23,11 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='barcode']" position="after">
                 <field name="sewing_teams" widget="many2many_tags" domain="[('name', 'like', 'Sewing')]" />
-            </xpath>
-            <xpath expr="//field[@name='hs_code']" position="after">
                 <field name="origin_country_id" options="{'no_create': 1}"/>
             </xpath>
+<!--            <xpath expr="//field[@name='hs_code']" position="after">-->
+<!--                <field name="origin_country_id" options="{'no_create': 1}"/>-->
+<!--            </xpath>-->
         </field>
     </record>
 </odoo>

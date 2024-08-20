@@ -1,15 +1,17 @@
-from odoo import models, fields, api,_
+from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 import requests
 import json
 import logging
 import base64
+
 _logger = logging.getLogger(__name__)
+
 
 class Account_Payment(models.Model):
     _inherit = 'account.payment'
 
-    xero_payment_id = fields.Char(string="Xero Payment Id",copy=False)
+    xero_payment_id = fields.Char(string="Xero Payment Id", copy=False)
     xero_prepayment_id = fields.Char(string="Xero Prepayment Id", copy=False)
     xero_overpayment_id = fields.Char(string="Xero Overpayment Id", copy=False)
 
@@ -32,7 +34,6 @@ class Account_Payment(models.Model):
     # @api.model
     # def delete_log(self,log_search):
     #     # Deletes the record of the payments from logs when reconciled from front-end
-    #     # print("Payment delete function.")
     #     log_id = log_search.write(
     #         {
     #             'active': False,
@@ -56,25 +57,19 @@ class Account_Payment(models.Model):
     #     #  __________                    __________      |
     #     # | Cancelled|<-----------------| cancel() |<-----
     #     # |__________|                  |__________|
-    #     print("here :--------------------5------------------>")
     #     log_created = None
     #     for rec in self:
     #
-    #         print("rec.state : ",rec.state)
     #         if rec.state != 'draft':
     #             raise UserError(_("Only a draft payment can be posted."))
-    #         print("rec.reconciled_invoice_ids : ",rec.reconciled_invoice_ids)
     #
     #         if any(inv.state != 'posted' for inv in rec.reconciled_invoice_ids):
     #             # raise ValidationError(_("The payment cannot be processed because the invoice is not open!"))
-    #             print("xero_payment_id : ",xero_payment_id)
     #             if xero_payment_id:
     #                 log_search = self.env['xero.log'].search([('xero_payment_id', '=', self.xero_payment_id)])
-    #                 print("log_search : ",log_search)
     #                 if log_search:
     #                     _logger.info(_("Payment found in Logs details."))
     #                 elif not log_search:
-    #                     print("invoice_id.state :----------------> ",invoice_id.state)
     #                     if (invoice_id.state == 'draft'):
     #                         log_created = self.create_log(xero_payment_id, invoice_id)
     #         else:
@@ -82,7 +77,6 @@ class Account_Payment(models.Model):
     #             if log_search:
     #                 log_created = self.delete_log(log_search)
     #
-    #     print("log_created :-----------------------> ",log_created)
     #     mmmmmmmmmmmmm
     #     if not log_created:
     #         payments_need_trans = self.filtered(lambda pay: pay.payment_token_id and not pay.payment_transaction_id)
@@ -93,9 +87,6 @@ class Account_Payment(models.Model):
     #         transactions.s2s_do_transaction()
     #
     #         return res
-
-
-
 
     def prepare_payment_export_dict(self):
         """Create Dictionary to export to XERO"""
@@ -128,13 +119,7 @@ class Account_Payment(models.Model):
                         ApplyOn = "CreditNote"
                         ApplyOn_Dict = {"CreditNoteID": xero_id}
 
-                    # print("xero_id ::::::::::::: ",xero_id)
-                    # print("ApplyOn ::::::::::::: ",ApplyOn)
-                    # print("ApplyOn_Dict ::::::::::::: ",ApplyOn_Dict)
                     #
-                    # print("self.journal_id : ",self.journal_id)
-                    # print("self.journal_id.default_debit_account_id : ",self.journal_id.default_account_id)
-                    # print("self.journal_id.default_debit_account_id.xero_account_id : ",self.journal_id.default_account_id.xero_account_id)
 
                     if self.journal_id.default_account_id:
                         if not self.journal_id.default_account_id.xero_account_id:
@@ -155,18 +140,21 @@ class Account_Payment(models.Model):
                             #     })
                             if len(invoice_ids) == 1:
                                 vals.update({
-                                              ApplyOn: ApplyOn_Dict ,
-                                              "Account": {"AccountID": self.journal_id.default_account_id.xero_account_id},
-                                              "Date": str(self.date),
-                                              "Amount": self.amount,
-                                              "Reference": self.name
-                                            })
-
+                                    ApplyOn: ApplyOn_Dict,
+                                    "Account": {"AccountID": self.journal_id.default_account_id.xero_account_id},
+                                    "Date": str(self.date),
+                                    "Amount": self.amount,
+                                    "Reference": self.name
+                                })
+        _logger.info(_(f"valssssssssssssssss{vals}"))
         return vals
 
     # @api.multi
     def get_head(self):
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        if self._context.get('cron'):
+            xero_config = self.company_id
+        else:
+            xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
         client_id = xero_config.xero_client_id
         client_secret = xero_config.xero_client_secret
 
@@ -182,6 +170,21 @@ class Account_Payment(models.Model):
         }
         return headers
 
+    @api.model
+    def exportPayment_cron(self):
+        # xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
+        companys = self.env['res.company'].search([])
+        self._context['cron'] = 1
+        for xero_config in companys:
+            if xero_config.xero_client_id and xero_config.xero_client_secret:
+                xero_config.refresh_token()
+                payment_records = self.env['account.payment'].search(
+                    [('date', '>', xero_config.export_record_after), ('xero_payment_id', '=', False),
+                     ('company_id', '=', xero_config.id)])
+                for payment in payment_records:
+                    payment.create_payment_in_xero()
+            else:
+                continue
 
     @api.model
     def create_payment_in_xero(self):
@@ -191,15 +194,19 @@ class Account_Payment(models.Model):
             payments = self.browse(self._context.get('active_ids'))
         else:
             payments = self
+        if payments and self._context.get('cron'):
+            xero_config = payments[0].company_id
 
         _logger.info('Found Payments are : {}'.format(payments))
         for payment in payments:
+            _logger.info('Process Payments is : {}'.format(payment))
             if payment.xero_payment_id:
                 raise ValidationError("Payment is already exported to Xero!")
             if not payment.xero_payment_id:
                 vals = payment.prepare_payment_export_dict()
                 if not vals:
-                    raise ValidationError("Payment can not be exported, Please reconcile payment before exporting....!!")
+                    raise ValidationError(
+                        "Payment can not be exported, Please reconcile payment before exporting....!!")
 
                 parsed_dict = json.dumps(vals)
                 if xero_config.xero_oauth_token:
@@ -234,7 +241,8 @@ class Account_Payment(models.Model):
                                     if element.get('ValidationErrors'):
                                         for err in element.get('ValidationErrors'):
                                             raise ValidationError(
-                                                '(Payment) Xero Exception for Odoo Payment -  '+element.get('Reference')+'  =>'+ err.get(
+                                                '(Payment) Xero Exception for Odoo Payment -  ' + element.get(
+                                                    'Reference') + '  =>' + err.get(
                                                     'Message'))
                             elif response_data.get('Message'):
                                 raise ValidationError(
@@ -257,10 +265,3 @@ class Account_Payment(models.Model):
             'view_id': success_form.id,
             'target': 'new',
         }
-
-    @api.model
-    def exportPayment_cron(self):
-        xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        payment_records = self.env['account.payment'].search([('date', '>', xero_config.export_record_after), ('xero_payment_id', '=', False)])
-        for payment in payment_records:
-            payment.create_payment_in_xero()

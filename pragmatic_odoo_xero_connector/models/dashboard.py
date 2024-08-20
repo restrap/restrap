@@ -285,25 +285,25 @@ class PurchaseOrderExtended(models.Model):
             if element == 'last_month':
                 if result.date_approve.date() <= today and result.date_approve.date() >= month_ago:
                     quotation_number.append(result.name)
-                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y"))
+                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y") if result.date_planned else None)
                     total.append(f"{result.currency_id.symbol} {result.amount_total}")
                     status.append(result.state)
             elif element == 'last_week':
                 if result.date_approve.date() <= today and result.date_approve.date() >= week_ago:
                     quotation_number.append(result.name)
-                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y"))
+                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y") if result.date_planned else None)
                     total.append(f"{result.currency_id.symbol} {result.amount_total}")
                     status.append(result.state)
             elif element == 'today':
                 if result.date_approve.date() == today:
                     quotation_number.append(result.name)
-                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y"))
+                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y") if result.date_planned else None)
                     total.append(f"{result.currency_id.symbol} {result.amount_total}")
                     status.append(result.state)
             else:
                 if result.date_approve.date() <= today and result.date_approve.date() >= six_month:
                     quotation_number.append(result.name)
-                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y"))
+                    create_date.append(result.date_planned.date().strftime("%d/%m/%Y") if result.date_planned else None)
                     total.append(f"{result.currency_id.symbol} {result.amount_total}")
                     status.append(result.state)
         summary_dict['quotation_number'] = quotation_number
@@ -920,20 +920,19 @@ class AccountMoveExtended(models.Model):
             [('move_type', '=', 'out_invoice'), ('xero_invoice_id', '!=', False),
              ('payment_state', '=', "not_paid"), ('state', '!=', 'cancel')])
         for invoice in invoice_obj:
-            if invoice.invoice_origin != False:
-                if self.env['sale.order'].search([('name', '=', invoice.invoice_origin)]):
-                    if element == 'last_month':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
-                            invoice_count += 1
-                    elif element == 'last_week':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
-                            invoice_count += 1
-                    elif element == 'today':
-                        if invoice.invoice_date == today:
-                            invoice_count += 1
-                    else:
-                        if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
-                            invoice_count += 1
+            if invoice.sale_order_count > 0:
+                if element == 'last_month':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
+                        invoice_count += 1
+                elif element == 'last_week':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
+                        invoice_count += 1
+                elif element == 'today':
+                    if invoice.invoice_date == today:
+                        invoice_count += 1
+                else:
+                    if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
+                        invoice_count += 1
         return invoice_count
 
     @api.model
@@ -947,20 +946,19 @@ class AccountMoveExtended(models.Model):
             [('move_type', '=', 'out_invoice'), ('xero_invoice_id', '!=', False),
              ('payment_state', '=', "not_paid"), ('state', '!=', 'cancel')])
         for invoice in invoice_obj:
-            if invoice.invoice_origin != False:
-                if self.env['sale.order'].search([('name', '=', invoice.invoice_origin)]):
-                    if element == 'last_month':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
-                            invoice_id.append(invoice.id)
-                    elif element == 'las`t_week':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
-                            invoice_id.append(invoice.id)
-                    elif element == 'today':
-                        if invoice.invoice_date == today:
-                            invoice_id.append(invoice.id)
-                    else:
-                        if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
-                            invoice_id.append(invoice.id)
+            if invoice.sale_order_count > 0:
+                if element == 'last_month':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
+                        invoice_id.append(invoice.id)
+                elif element == 'las`t_week':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
+                        invoice_id.append(invoice.id)
+                elif element == 'today':
+                    if invoice.invoice_date == today:
+                        invoice_id.append(invoice.id)
+                else:
+                    if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
+                        invoice_id.append(invoice.id)
         return invoice_id
 
 
@@ -975,18 +973,19 @@ class AccountMoveExtended(models.Model):
             [('move_type', '=', 'out_invoice'), ('xero_invoice_id', '!=', False), ('ref', '!=', False),
              ('payment_state', '=', 'paid')])
         for invoice in invoice_obj:
-            if element == 'last_month':
-                if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
-                    invoice_paid_count += 1
-            elif element == 'last_week':
-                if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
-                    invoice_paid_count += 1
-            elif element == 'today':
-                if invoice.invoice_date == today:
-                    invoice_paid_count += 1
-            else:
-                if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
-                    invoice_paid_count += 1
+            if invoice.sale_order_count > 0:
+                if element == 'last_month':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
+                        invoice_paid_count += 1
+                elif element == 'last_week':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
+                        invoice_paid_count += 1
+                elif element == 'today':
+                    if invoice.invoice_date == today:
+                        invoice_paid_count += 1
+                else:
+                    if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
+                        invoice_paid_count += 1
         return invoice_paid_count
 
     @api.model
@@ -997,23 +996,22 @@ class AccountMoveExtended(models.Model):
         month_ago = today - DT.timedelta(days=30)
         six_month_ago = today - DT.timedelta(days=180)
         invoice_obj = self.search(
-            [('move_type', '=', 'out_invoice'), ('xero_invoice_id', '!=', False),
+            [('move_type', '=', 'out_invoice'), ('xero_invoice_id', '!=', False), ('ref', '!=', False),
              ('payment_state', '=', 'paid')])
         for invoice in invoice_obj:
-            if invoice.invoice_origin != False:
-                if self.env['sale.order'].search([('name', '=', invoice.invoice_origin)]):
-                    if element == 'last_month':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
-                            invoice_paid_id.append(invoice.id)
-                    elif element == 'last_week':
-                        if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
-                            invoice_paid_id.append(invoice.id)
-                    elif element == 'today':
-                        if invoice.invoice_date == today:
-                            invoice_paid_id.append(invoice.id)
-                    else:
-                        if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
-                            invoice_paid_id.append(invoice.id)
+            if invoice.sale_order_count > 0:
+                if element == 'last_month':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= month_ago:
+                        invoice_paid_id.append(invoice.id)
+                elif element == 'last_week':
+                    if invoice.invoice_date <= today and invoice.invoice_date >= week_ago:
+                        invoice_paid_id.append(invoice.id)
+                elif element == 'today':
+                    if invoice.invoice_date == today:
+                        invoice_paid_id.append(invoice.id)
+                else:
+                    if invoice.invoice_date <= today and invoice.invoice_date >= six_month_ago:
+                        invoice_paid_id.append(invoice.id)
         return invoice_paid_id
 
     @api.model
@@ -1364,20 +1362,19 @@ class AccountMoveExtended(models.Model):
              ('xero_invoice_number', '!=', False), ('payment_state', '=', "not_paid"), ('state', '!=', "cancel")])
         for bill in bill_obj:
             if bill.invoice_line_ids:
-                if bill.invoice_origin != False:
-                    if self.env['purchase.order'].search([('name', '=', bill.invoice_origin)]):
-                        if element == 'last_month':
-                            if bill.invoice_date <= today and bill.invoice_date >= month_ago:
-                                bill_unpaid_count += 1
-                        elif element == 'last_week':
-                            if bill.invoice_date <= today and bill.invoice_date >= week_ago:
-                                bill_unpaid_count += 1
-                        elif element == 'today':
-                            if bill.invoice_date == today:
-                                bill_unpaid_count += 1
-                        else:
-                            if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
-                                bill_unpaid_count += 1
+                if bill.purchase_order_count > 0:
+                    if element == 'last_month':
+                        if bill.invoice_date <= today and bill.invoice_date >= month_ago:
+                            bill_unpaid_count += 1
+                    elif element == 'last_week':
+                        if bill.invoice_date <= today and bill.invoice_date >= week_ago:
+                            bill_unpaid_count += 1
+                    elif element == 'today':
+                        if bill.invoice_date == today:
+                            bill_unpaid_count += 1
+                    else:
+                        if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
+                            bill_unpaid_count += 1
 
         return bill_unpaid_count
 
@@ -1392,20 +1389,19 @@ class AccountMoveExtended(models.Model):
             [('move_type', '=', 'in_invoice'), ('xero_invoice_id', '!=', False),
              ('xero_invoice_number', '!=', False), ('payment_state', '=', "not_paid"), ('state', '!=', "cancel")])
         for bill in bill_obj:
-            if bill.invoice_origin != False:
-                if self.env['purchase.order'].search([('name', '=', bill.invoice_origin)]):
-                    if element == 'last_month':
-                        if bill.invoice_date <= today and bill.invoice_date >= month_ago:
-                            bill_unpaid_id.append(bill.id)
-                    elif element == 'last_week':
-                        if bill.invoice_date <= today and bill.invoice_date >= week_ago:
-                            bill_unpaid_id.append(bill.id)
-                    elif element == 'today':
-                        if bill.invoice_date == today:
-                            bill_unpaid_id.append(bill.id)
-                    else:
-                        if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
-                            bill_unpaid_id.append(bill.id)
+            if bill.purchase_order_count > 0:
+                if element == 'last_month':
+                    if bill.invoice_date <= today and bill.invoice_date >= month_ago:
+                        bill_unpaid_id.append(bill.id)
+                elif element == 'last_week':
+                    if bill.invoice_date <= today and bill.invoice_date >= week_ago:
+                        bill_unpaid_id.append(bill.id)
+                elif element == 'today':
+                    if bill.invoice_date == today:
+                        bill_unpaid_id.append(bill.id)
+                else:
+                    if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
+                        bill_unpaid_id.append(bill.id)
         return bill_unpaid_id
 
     @api.model
@@ -1418,20 +1414,19 @@ class AccountMoveExtended(models.Model):
         bill_obj = self.search([('move_type', '=', 'in_invoice'), ('xero_invoice_id', '!=', False),
                                 ('xero_invoice_number', '!=', False), ('payment_state', '=', "paid")])
         for bill in bill_obj:
-            if bill.invoice_origin != False:
-                if self.env['purchase.order'].search([('name','=',bill.invoice_origin)]):
-                    if element == 'last_month':
-                        if bill.invoice_date <= today and bill.invoice_date >= month_ago:
-                            paid_bill_count += 1
-                    elif element == 'last_week':
-                        if bill.invoice_date <= today and bill.invoice_date >= week_ago:
-                            paid_bill_count += 1
-                    elif element == 'today':
-                        if bill.invoice_date == today:
-                            paid_bill_count += 1
-                    else:
-                        if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
-                            paid_bill_count += 1
+            if bill.purchase_order_count > 0:
+                if element == 'last_month':
+                    if bill.invoice_date <= today and bill.invoice_date >= month_ago:
+                        paid_bill_count += 1
+                elif element == 'last_week':
+                    if bill.invoice_date <= today and bill.invoice_date >= week_ago:
+                        paid_bill_count += 1
+                elif element == 'today':
+                    if bill.invoice_date == today:
+                        paid_bill_count += 1
+                else:
+                    if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
+                        paid_bill_count += 1
         return paid_bill_count
 
     @api.model
@@ -1444,20 +1439,19 @@ class AccountMoveExtended(models.Model):
         bill_obj = self.search([('move_type', '=', 'in_invoice'), ('xero_invoice_id', '!=', False),
                                 ('xero_invoice_number', '!=', False), ('payment_state', '=', "paid")])
         for bill in bill_obj:
-            if bill.invoice_origin != False:
-                if self.env['purchase.order'].search([('name', '=', bill.invoice_origin)]):
-                    if element == 'last_month':
-                        if bill.invoice_date <= today and bill.invoice_date >= month_ago:
-                            paid_bill_id.append(bill.id)
-                    elif element == 'last_week':
-                        if bill.invoice_date <= today and bill.invoice_date >= week_ago:
-                            paid_bill_id.append(bill.id)
-                    elif element == 'today':
-                        if bill.invoice_date == today:
-                            paid_bill_id.append(bill.id)
-                    else:
-                        if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
-                            paid_bill_id.append(bill.id)
+            if bill.purchase_order_count > 0:
+                if element == 'last_month':
+                    if bill.invoice_date <= today and bill.invoice_date >= month_ago:
+                        paid_bill_id.append(bill.id)
+                elif element == 'last_week':
+                    if bill.invoice_date <= today and bill.invoice_date >= week_ago:
+                        paid_bill_id.append(bill.id)
+                elif element == 'today':
+                    if bill.invoice_date == today:
+                        paid_bill_id.append(bill.id)
+                else:
+                    if bill.invoice_date <= today and bill.invoice_date >= six_month_ago:
+                        paid_bill_id.append(bill.id)
         return paid_bill_id
 
     @api.model

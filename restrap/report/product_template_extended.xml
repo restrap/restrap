@@ -1,0 +1,41 @@
+<odoo>
+    <template id="label_production_view_restrap" inherit_id="stock.label_product_product_view">
+
+        <xpath expr="//t[@t-translation='off']" position="replace">
+            <t t-translation="off">
+                ^XA^CI28
+                <!--^FT100,80^A0N,40,30^FD<t t-esc="product.display_name"/>^FS-->
+                <t t-if="product.default_code and len(product.default_code) &gt; 15">
+                    ^FT120,45^A0N,30,24^FD<t t-esc="product.default_code[:15]"/>^FS
+                    ^FT120,80^A0N,35,20^FD<t t-esc="product.default_code[15:30]"/>^FS
+                </t>
+                <t t-else="">
+                    ^FT120,80^A0N,35,20^FD<t t-esc="product.default_code"/>^FS
+                </t>
+                <t t-if="price_included">
+                    ^FO600,100,1
+                    ^CI28
+                    <t t-if="currency_id.position == 'after'">
+                        ^A0N,66,48^FH^FD
+                        <t t-esc="pricelist._get_product_price(product, 1, currency_id)"
+                           t-options='{"widget": "float", "precision": 2}'/>
+                        <t t-esc="currency_id.symbol"/>^FS
+                    </t>
+                    <t t-if="currency_id.position == 'before'">
+                        ^A0N,66,48^FH^FD
+                        <t t-esc="currency_id.symbol"/>
+                        <t t-esc="pricelist._get_product_price(product, 1, currency_id)"
+                           t-options='{"widget": "float", "precision": 2}'/>^FS
+                    </t>
+                </t>
+                <t t-if="barcode">
+                    ^FO120,100^BY2
+                    ^BCN,100,Y,N,N
+                    ^FD<t t-esc="barcode"/>^FS
+                </t>
+                ^XZ
+            </t>
+        </xpath>
+
+    </template>
+</odoo>

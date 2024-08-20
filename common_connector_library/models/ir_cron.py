@@ -8,11 +8,10 @@ class IrCron(models.Model):
     _inherit = "ir.cron"
 
     def try_cron_lock(self):
-        """ To check scheduler status is running or when nextcall from cron id. It will be used while we are
-            performing an operation, and we have a scheduler for that.
-            @return: Message like scheduler is running in backend.
-            @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 23 September 2021 .
-            Task_id: 178058
+        """
+        Define this method for check scheduler status is running or when nextcall from cron id.
+        It will be used while we are performing an operation, and we have a scheduler for that.
+        :return: scheduler details or message like scheduler is running in backend
         """
         try:
             self._cr.execute("""SELECT id FROM "%s" WHERE id IN %%s FOR UPDATE NOWAIT""" % self._table,

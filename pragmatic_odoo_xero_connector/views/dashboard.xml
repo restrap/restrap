@@ -4,7 +4,9 @@
             <field name="name">Dashboard</field>
             <field name="tag">meeting_chart</field>
         </record>
-        <menuitem name="Xero Odoo Connector" id="menu_xero_odoo_connector"/>
+        <menuitem name="Xero Odoo Connector" id="menu_xero_odoo_connector"
+            web_icon="pragmatic_odoo_xero_connector,static/description/icon.png"/>
+
         <menuitem id="menu_xero_odoo_connector_dashboard" name="Dashboard"
                   action="view_dashboard_action2" parent="menu_xero_odoo_connector"
                   sequence="10"/>

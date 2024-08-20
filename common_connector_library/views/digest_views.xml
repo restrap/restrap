@@ -32,13 +32,10 @@
                 </page>
             </xpath>
             <xpath expr="//page[@name='kpis']" position="attributes">
-                <attribute name="attrs">{'invisible':[('is_connector_digest','=',True)]}</attribute>
+                <attribute name="invisible">is_connector_digest</attribute>
             </xpath>
             <xpath expr="//page[@name='connector_kpis']" position="attributes">
-                <attribute name="attrs">{'invisible':[('is_connector_digest','=',False)]}</attribute>
-            </xpath>
-            <xpath expr="//page[@name='how_to']" position="attributes">
-                <attribute name="attrs">{'invisible':[('is_connector_digest','=',True)]}</attribute>
+                <attribute name="invisible">not is_connector_digest</attribute>
             </xpath>
         </field>
     </record>

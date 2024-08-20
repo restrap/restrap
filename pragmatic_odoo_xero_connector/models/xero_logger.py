@@ -10,5 +10,5 @@ class XeroLoger(models.Model):
     message = fields.Char('Message')
     activity = fields.Char('Activity')
     xero_ref = fields.Char('Xero Ref')
-    status_code = fields.Char('Xero Ref')
+    status_code = fields.Char('Status Code')
     status = fields.Selection([('failed', 'Failed'), ('done', 'Done')])

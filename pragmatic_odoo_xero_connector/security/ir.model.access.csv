@@ -4,3 +4,6 @@ access_xero_tax_type,access_xero_tax_type,model_xero_tax_type,base.group_user,1,
 access_xero_error_log,access_xero_error_log,model_xero_error_log,base.group_user,1,1,1,1
 access_res_company_message,access_res_company_message,model_res_company_message,base.group_user,1,1,1,1
 pragmatic_odoo_xero_connector.access_xero_logger,access_xero_logger,pragmatic_odoo_xero_connector.model_xero_logger,base.group_user,1,1,1,1
+access_stock_picking_type_new,access_stock_picking_type_new,model_stock_picking_type_new,base.group_user,1,1,1,1
+
+

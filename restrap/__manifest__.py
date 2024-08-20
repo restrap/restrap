@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Restrap Module",
-    "version": "15.0.1",
+    "version": "17.0.1.3",
     "author": "Smart IT Ltd",
     "category": "Other",
     "summary": "Restrap Smart IT Developments",
     'description': "Custom module for Restrap developed by Smart IT Ltd",
     'maintainer': "Smart IT Ltd",
     'website': 'smart-ltd.co.uk',
-    "depends": ['base', 'mrp_workorder', 'sale_management', 'delivery'],
+    "depends": ['base', 'mrp_workorder', 'sale_management', 'delivery', 'stock_delivery'],
     "data": [
         'security/mrp_security.xml',
         'security/ir.model.access.csv',
@@ -25,6 +25,7 @@
         'report/report_deliveryslip.xml',
         'report/report_templates.xml',
         'report/stock_report_views.xml',
+        'report/product_template_extended.xml',
         'views/product_views.xml',
         'views/mrp_routing_workcenter_views.xml',
         'views/res_company_views.xml',

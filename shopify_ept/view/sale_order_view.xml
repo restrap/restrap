@@ -11,7 +11,7 @@
                 <field name="shopify_instance_id" invisible="1"/>
                 <button name="action_open_cancel_wizard" string="Cancel In Shopify"
                         type="object"
-                        attrs="{'invisible':['|','|',('state','!=','cancel'),('canceled_in_shopify','=',True),('shopify_instance_id','=',False)]}"
+                        invisible="state != 'cancel' or canceled_in_shopify or not shopify_instance_id"
                         class="oe_highlight">
                 </button>
             </button>
@@ -63,7 +63,7 @@
         </field>
     </record>
 
-    <!--Inherit Form view of shopify sale order -->
+    <!--Inherit Form view of shopify shopify sale order -->
     <record id="view_order_form" model="ir.ui.view">
         <field name="name">sale.order.form.inherit</field>
         <field name="model">sale.order</field>
@@ -77,13 +77,12 @@
                     <attribute name="optional">hide</attribute>
                 </xpath>
                 <notebook position="inside">
-                    <page string="Shopify Info" name="shopify_ept"
-                          attrs="{'invisible':[('shopify_instance_id','=',False)]}">
+                    <page string="Shopify Info" name="shopify_ept" invisible="not shopify_instance_id">
                         <group>
                             <group>
                                 <label for="shopify_order_id"/>
                                 <div name="shopify_order_link">
-                                    <field name="shopify_order_id" readonly="True"/>
+                                    <field name="shopify_order_id" readonly="True" style="width:auto !important;"/>
                                     <button name="action_order_ref_redirect"
                                             type="object"
                                             icon="fa-external-link ">
@@ -104,7 +103,7 @@
                                 <field name="is_shopify_multi_payment" invisible="1"/>
                             </group>
                         </group>
-                        <group string="Risks">
+                        <div string="Risks">
                             <field name="risk_ids" readonly="1" nolabel="1">
                                 <tree>
                                     <field name="name"/>
@@ -132,9 +131,8 @@
                                     </group>
                                 </form>
                             </field>
-                        </group>
-                        <group string="Multi Payments" name="multi_payments"
-                               attrs="{'invisible':[('is_shopify_multi_payment','=',False)]}">
+                        </div>
+                        <div string="Multi Payments" name="multi_payments" invisible="not is_shopify_multi_payment">
                             <field name="shopify_payment_ids" readonly="1" nolabel="1">
                                 <tree>
                                     <field name="payment_gateway_id"/>
@@ -155,7 +153,7 @@
                                     </group>
                                 </form>
                             </field>
-                        </group>
+                        </div>
                     </page>
                 </notebook>
             </data>

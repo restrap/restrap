@@ -13,8 +13,8 @@ class QueueLineDashboard(models.AbstractModel):
     def get_data(self, **kwargs):
         """
         This method is use to prepare data for the queue line dashboard.
-        @param table: Table name of queue line like order_data_queue_line_ept
-        @return dashboard_data: It will return the list of data like
+        :param: kwargs: dict {}
+        :return: dashboard_data: It will return the list of data like
         [{'state': {'duration': [len of record, [queue_line_ids]]}},]
         """
         table = kwargs.get('table', '').replace('.', '_')
@@ -32,6 +32,13 @@ class QueueLineDashboard(models.AbstractModel):
         return data
 
     def _prepare_query(self, duration, state, table):
+        """
+        Define this method for prepare query for get respective table data.
+        :param: duration: selected record duration
+        :param: state: record state
+        :param: table: table name
+        :return: list of record ids
+        """
         qry = f"""
         SELECT 
             id 

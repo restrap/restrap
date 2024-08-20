@@ -3,6 +3,7 @@ import pytz
 
 from odoo import fields, models, tools, _
 from datetime import datetime
+from werkzeug.urls import url_join
 from odoo.exceptions import AccessError
 from dateutil.relativedelta import relativedelta
 from odoo.tools.date_utils import start_of, end_of
@@ -45,14 +46,12 @@ class Digest(models.Model):
     def _prepare_domain_based_on_connector(self):
         """
         This method is need to override in all connector for prepare domain based on instance.
-        @author: Meera Sidapara on date 05-July-2022.
         """
         return True
 
     def _prepare_query_domain(self, domain, table_ref):
         """
         This method is used to prepared dynamic domain based on query string and query table reference.
-        @author: Meera Sidapara on Date 05-July-2022.
         @return: domain of query string
         """
         where_string = ""
@@ -64,7 +63,6 @@ class Digest(models.Model):
     def get_account_total_revenue(self, domain):
         """
         Use: To get the list of connector's account total revenue.
-        @author: Meera Sidapara on Date 06-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -84,7 +82,6 @@ class Digest(models.Model):
     def get_total_orders_count(self, domain):
         """
         Use: To get the list of connector's total orders count.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -100,7 +97,6 @@ class Digest(models.Model):
     def get_shipped_orders_count(self, domain):
         """
         Use: To get the list of connector's Total shipped orders count.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -118,7 +114,6 @@ class Digest(models.Model):
     def get_pending_shipment_on_date_count(self, domain):
         """
         Use: To get the list of connector's pending shipment on date count.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -136,7 +131,6 @@ class Digest(models.Model):
     def get_cancel_orders_count(self, domain):
         """
         Use: To get the list of connector's Total cancel orders count.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -151,7 +145,6 @@ class Digest(models.Model):
     def get_orders_average(self, domain):
         """
         Use: To get the list of connector's Total average of orders.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -171,7 +164,6 @@ class Digest(models.Model):
     def get_refund_orders_count(self, domain):
         """
         Use: To get the list of connector's Total refund orders count.
-        @author: Meera Sidapara on Date 04-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -190,7 +182,6 @@ class Digest(models.Model):
     def get_late_delivery_orders_count(self, domain):
         """
         Use: To get the list of connector's Total late delivery orders count.
-        @author: Meera Sidapara on Date 11-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -220,7 +211,6 @@ class Digest(models.Model):
     def get_on_time_shipping_ratio(self, domain):
         """
         Use: To get the list of connector's On Time shipping ratio.
-        @author: Meera Sidapara on Date 11-July-2022.
         @return: total number of connector's sale orders ids and action for sale orders of current instance.
         """
         for record in self:
@@ -241,14 +231,14 @@ class Digest(models.Model):
                 shipping_count = query_res and query_res[0][0] / query_res[1][0] * 100
             record.kpi_on_shipping_orders_value = shipping_count
 
-    def _action_send_to_user(self, user, tips_count=1, consum_tips=True):
+    def _action_send_to_user(self, user, tips_count=1, consume_tips=True):
         """
         This Method is used to set email template of connector.
-        @override by: Meera Sidapara on Date 04-July-2022.
-        @task: 194458 - Digest email development
         """
         if self.is_connector_digest:
-            rendered_body = self.env['mail.render.mixin'].with_context(preserve_comments=True)._render_template(
+            unsubscribe_token = self._get_unsubscribe_token(user.id)
+
+            rendered_body = self.env['mail.render.mixin']._render_template(
                 'common_connector_library.connector_digest_mail_main',
                 'digest.digest',
                 self.ids,
@@ -259,15 +249,16 @@ class Digest(models.Model):
                     'top_button_url': self.get_base_url(),
                     'company': user.company_id,
                     'user': user,
-                    'unsubscribe_token': self._get_unsubscribe_token(user.id),
+                    'unsubscribe_token': unsubscribe_token,
                     'tips_count': tips_count,
                     'formatted_date': datetime.today().strftime('%B %d, %Y'),
                     'display_mobile_banner': True,
                     'kpi_data': self._compute_kpis(user.company_id, user),
-                    'tips': self._compute_tips(user.company_id, user, tips_count=tips_count, consumed=consum_tips),
+                    'tips': self._compute_tips(user.company_id, user, tips_count=tips_count, consumed=consume_tips),
                     'preferences': self._compute_preferences(user.company_id, user),
                 },
-                post_process=True
+                post_process=True,
+                options={'preserve_comments': True}
             )[self.id]
             full_mail = self.env['mail.render.mixin']._render_encapsulate(
                 'common_connector_library.connector_digest_mail_layout',
@@ -278,29 +269,33 @@ class Digest(models.Model):
                 },
             )
             # create a mail_mail based on values, without attachments
+            unsub_url = url_join(self.get_base_url(),
+                                 f'/digest/{self.id}/unsubscribe?token={unsubscribe_token}&user_id={user.id}&one_click=1')
             mail_values = {
                 'auto_delete': True,
                 'author_id': self.env.user.partner_id.id,
+                'body_html': full_mail,
                 'email_from': (
                         self.company_id.partner_id.email_formatted
                         or self.env.user.email_formatted
                         or self.env.ref('base.user_root').email_formatted
                 ),
                 'email_to': user.email_formatted,
-                'body_html': full_mail,
+                # Add headers that allow the MUA to offer a one click button to unsubscribe (requires DKIM to work)
+                'headers': {
+                    'List-Unsubscribe': f'<{unsub_url}>',
+                    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                    'X-Auto-Response-Suppress': 'OOF',  # avoid out-of-office replies from MS Exchange
+                },
                 'state': 'outgoing',
                 'subject': '%s: %s' % (user.company_id.name, self.name),
             }
             self.env['mail.mail'].sudo().create(mail_values)
             return True
-        return super(Digest, self)._action_send_to_user(user, tips_count=1, consum_tips=True)
+        return super(Digest, self)._action_send_to_user(user)
 
     def _compute_kpis(self, company, user):
-        """
-        This Method is used to compute kpi data based on Yesterday, Last week, Last month, Last quarter.
-        @override by: Meera Sidapara on Date 04-July-2022.
-        @task: 194458 - Digest email development
-        """
+        """ This Method is used to compute kpi data based on Yesterday, Last week, Last month, Last quarter. """
         if self.is_connector_digest:
             self.ensure_one()
             digest_fields = self._get_kpi_fields()
@@ -331,10 +326,10 @@ class Digest(models.Model):
                     try:
                         compute_value = digest[field_name + '_value']
                         # Context start and end date is different each time so invalidate to recompute.
-                        digest.invalidate_cache([field_name + '_value'])
+                        digest.invalidate_model([field_name + '_value'])
                         previous_value = previous_digest[field_name + '_value']
                         # Context start and end date is different each time so invalidate to recompute.
-                        previous_digest.invalidate_cache([field_name + '_value'])
+                        previous_digest.invalidate_model([field_name + '_value'])
                     except AccessError:  # no access rights -> just skip that digest details from that user's digest email
                         invalid_fields.append(field_name)
                         continue
@@ -359,8 +354,6 @@ class Digest(models.Model):
     def _compute_timeframes(self, company):
         """
         This Method is override to compute timeframe based on Yesterday, Last week, Last month, Last quarter.
-        @override by: Meera Sidapara on Date 04-July-2022.
-        @task: 194458 - Digest email development
         """
         if self.is_connector_digest:
             start_datetime = datetime.utcnow()

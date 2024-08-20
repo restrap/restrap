@@ -88,7 +88,6 @@ class ProductProduct(models.Model):
                     }
         else:
             if self.categ_id.property_account_expense_categ_id.xero_account_id:
-                # print("1 ------------> ", self.categ_id.property_account_expense_categ_id.xero_account_id)
 
                 if self.type == 'product' and not xero_config.non_tracked_item:
                     purchase_dict = {
@@ -186,8 +185,6 @@ class ProductProduct(models.Model):
                     })
 
 
-            # print("DICT P : ------> ",purchase_dict.update(tax_id_purchase))
-        # print("DICT  : ------> ", vals)
         return vals
 
     @api.model
@@ -235,16 +232,13 @@ class ProductProduct(models.Model):
 
         # product_item = self.env['product.product'].search([('id', '=', product.id)])
         # if product.product_tmpl_id:
-        #     print("hey", product.product_tmpl_id)
         #     self.create_main_product_in_xero(product, xero_config)
         # else:
-        #     print("hello", product.product_tmpl_id, product)
         if product:
             self.create_main_product_in_xero(product, xero_config)
 
     @api.model
     def create_main_product_in_xero(self, p, xero_config):
-        # print("--------------=====================------------ ", p)
         vals = p.prepare_product_export_dict()
         parsed_dict = json.dumps(vals)
         _logger.info("PARSED DICT : {} {}".format(parsed_dict, type(parsed_dict)))
@@ -276,7 +270,6 @@ class ProductProduct(models.Model):
                 })
                 self._cr.commit()
                 response_data = json.loads(data.text)
-                # print("RESPONSE DATA : ", response_data)
                 if response_data:
                     if response_data.get('Elements'):
                         for element in response_data.get('Elements'):
@@ -293,7 +286,10 @@ class ProductProduct(models.Model):
         else:
             raise ValidationError("Please Check Your Connection or error in application or refresh token..!!")
 
-ACCOUNT_DOMAIN = "['&', '&', '&', ('deprecated', '=', False), ('internal_type','=','other'), ('company_id', '=', current_company_id), ('is_off_balance', '=', False)]"
+
+        # there is a account_type field instead of internal_type in odoo16 there is no option 'other' in selection so we add account_type in ACCOUNT_DOMAIN
+
+# ACCOUNT_DOMAIN = "['&', '&', '&', ('deprecated', '=', False), ('account_type','not in',['asset_receivable','liability_payable']), ('company_id', '=', current_company_id), ('is_off_balance', '=', False)]"
 
 
 class product_template(models.Model):
@@ -305,4 +301,4 @@ class product_template(models.Model):
 class product_category(models.Model):
     _inherit = "product.category"
 
-    xero_inventory_account = fields.Many2one('account.account', company_dependent=True, domain=ACCOUNT_DOMAIN, string="XERO Inventory Account",copy=False)
+    xero_inventory_account = fields.Many2one('account.account', company_dependent=True, string="XERO Inventory Account",copy=False)

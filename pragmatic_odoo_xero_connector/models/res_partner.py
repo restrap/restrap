@@ -1,20 +1,21 @@
 import base64
-from odoo import models, fields, api,_
+from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 import requests
 import json
 import logging
+
 _logger = logging.getLogger(__name__)
+
 
 class Customer(models.Model):
     _inherit = 'res.partner'
 
-    xero_cust_id = fields.Char('Xero Customer Id',copy=False)
+    xero_cust_id = fields.Char('Xero Customer Id', copy=False)
 
     # @api.model
     # def create(self, vals):
     #     res = super(Customer, self).create(vals)
-    #     # print("\n\n\nRES : ------------> ",res)
     #     return res
 
     @api.model
@@ -25,7 +26,7 @@ class Customer(models.Model):
             if partner.xero_cust_id or (partner.parent_id and partner.parent_id.xero_cust_id):
                 return partner.xero_cust_id or partner.parent_id.xero_cust_id
             else:
-                self.create_main_customer_in_xero(partner,xero_config)
+                self.create_main_customer_in_xero(partner, xero_config)
                 if partner.xero_cust_id or (partner.parent_id and partner.parent_id.xero_cust_id):
                     return partner.xero_cust_id or partner.parent_id.xero_cust_id
         else:
@@ -33,7 +34,7 @@ class Customer(models.Model):
             if partner.xero_cust_id or (partner.parent_id and partner.parent_id.xero_cust_id):
                 return partner.xero_cust_id or partner.parent_id.xero_cust_id
             else:
-                self.create_main_customer_in_xero(partner,xero_config)
+                self.create_main_customer_in_xero(partner, xero_config)
                 if partner.xero_cust_id or (partner.parent_id and partner.parent_id.xero_cust_id):
                     return partner.xero_cust_id or partner.parent_id.xero_cust_id
 
@@ -74,6 +75,8 @@ class Customer(models.Model):
 
             if self.id:
                 dict['ContactNumber'] = self.id
+            # if self.website:
+            #     dict['Website'] = self.website
 
             # if self.supplier:
             #     dict['IsSupplier'] = True
@@ -82,7 +85,10 @@ class Customer(models.Model):
 
             if self.id:
 
-                billing_addr = self.search([('parent_id', '=', self.id), ('type', '=', 'invoice'),('company_id','=',company.id)])
+                # billing_addr = self.search(
+                #     [('parent_id', '=', self.id), ('type', '=', 'invoice'), ('company_id', '=', company.id)])
+                billing_addr = self.search(
+                    [('parent_id', '=', self.id), ('type', '=', 'invoice')], limit=1)
 
                 if billing_addr:
                     bill_add_dict['AddressType'] = "POBOX"
@@ -102,8 +108,13 @@ class Customer(models.Model):
                         country_id = self.env['res.country'].search([('id', '=', billing_addr.country_id.id)])
                         if country_id:
                             bill_add_dict.update({'Country': country_id.name})
+                    if billing_addr.name:
+                        bill_add_dict.update({'AttentionTo': billing_addr.name})
 
-                delivery_addr = self.search([('parent_id', '=', self.id), ('type', '=', 'delivery'),('company_id','=',company.id)])
+                # delivery_addr = self.search(
+                #     [('parent_id', '=', self.id), ('type', '=', 'delivery'), ('company_id', '=', company.id)],limit=1)
+                delivery_addr = self.search(
+                    [('parent_id', '=', self.id), ('type', '=', 'delivery')], limit=1)
                 if delivery_addr:
                     del_add_dict['AddressType'] = "STREET"
                     if delivery_addr.street:
@@ -115,15 +126,19 @@ class Customer(models.Model):
                     if delivery_addr.zip:
                         del_add_dict.update({'PostalCode': delivery_addr.zip})
                     if delivery_addr.state_id:
-                            del_add_dict.update({'Region': delivery_addr.state_id.name})
+                        del_add_dict.update({'Region': delivery_addr.state_id.name})
                     else:
                         del_add_dict.update({'Region': ''})
                     if delivery_addr.country_id:
                         country_id = self.env['res.country'].search([('id', '=', delivery_addr.country_id.id)])
                         if country_id:
                             del_add_dict.update({'Country': country_id.name})
+                    if delivery_addr.name:
+                        del_add_dict.update({'AttentionTo': delivery_addr.name})
 
                 if (not delivery_addr) and (not billing_addr):
+                    bill_add_dict.update({'AttentionTo': self.name})
+                    del_add_dict.update({'AttentionTo': self.name})
                     del_add_dict['AddressType'] = "STREET"
                     bill_add_dict['AddressType'] = "POBOX"
                     if self.street:
@@ -164,7 +179,8 @@ class Customer(models.Model):
             list_phone.append(mobile_dict)
             dict.update({'Phones': list_phone})
 
-            contacts = self.search([('parent_id', '=', self.id), ('type', '=', 'contact'),('company_id','=',company.id)],limit=5)
+            contacts = self.search(
+                [('parent_id', '=', self.id), ('type', '=', 'contact'), ('company_id', '=', company.id)], limit=5)
 
             if contacts:
                 for con in contacts:
@@ -197,31 +213,34 @@ class Customer(models.Model):
             bills = {}
             if self.property_supplier_payment_term_id:
                 line_ids = self.property_supplier_payment_term_id.line_ids[0]
-                if line_ids.option == 'day_after_invoice_date':
+                type = 'DAYSAFTERBILLDATE'
+                if line_ids.delay_type == 'days_after' and line_ids.nb_days:
                     type = 'DAYSAFTERBILLDATE'
-                if line_ids.option == 'after_invoice_month':
+                elif line_ids.delay_type == 'days_after_end_of_month':
                     type = 'DAYSAFTERBILLMONTH'
-                if line_ids.option == 'day_current_month':
-                    type = 'OFCURRENTMONTH'
-                if line_ids.option == 'day_following_month':
-                    type = 'OFFOLLOWINGMONTH'
+                # elif not line_ids.months and not line_ids.days:
+                #     type = 'OFCURRENTMONTH'
+                # elif line_ids.months:
+                #     type = 'OFFOLLOWINGMONTH'
+
                 bills = {
-                        "Day": line_ids.days,
-                        "Type": type
-                        }
+                    "Day": line_ids.nb_days,
+                    "Type": type
+                }
             sales = {}
             if self.property_payment_term_id:
                 line_ids = self.property_payment_term_id.line_ids[0]
-                if line_ids.option == 'day_after_invoice_date':
+                type = 'DAYSAFTERBILLDATE'
+                if line_ids.delay_type == 'days_after' and line_ids.nb_days:
                     type = 'DAYSAFTERBILLDATE'
-                if line_ids.option == 'after_invoice_month':
+                elif line_ids.delay_type == 'days_after_end_of_month':
                     type = 'DAYSAFTERBILLMONTH'
-                if line_ids.option == 'day_current_month':
-                    type = 'OFCURRENTMONTH'
-                if line_ids.option == 'day_following_month':
-                    type = 'OFFOLLOWINGMONTH'
+                # elif not line_ids.months and not line_ids.nb_days:
+                #     type = 'OFCURRENTMONTH'
+                # elif line_ids.months:
+                #     type = 'OFFOLLOWINGMONTH'
                 sales = {
-                    "Day": line_ids.days,
+                    "Day": line_ids.nb_days,
                     "Type": type
                 }
 
@@ -232,6 +251,20 @@ class Customer(models.Model):
                         "Sales": sales
                     }
                 })
+            # if self.website:
+            #     dict['Website'] = self.website
+            if self.vat:
+                dict['TaxNumber'] = self.vat
+            if self.bank_ids:
+                if self.bank_ids and self.bank_ids.currency_id:
+                    dict['DefaultCurrency'] = self.bank_ids.currency_id[0].name
+                else:
+                    dict['DefaultCurrency'] = self.company_id.currency_id.name
+            if self.bank_ids:
+                dict['BankAccountDetails'] = self.bank_ids[0].acc_number or False
+                # dict['BatchPayments'] = {'BankAccountNumber': self.bank_ids[0].acc_number or False,
+                #                          'BankAccountName': self.bank_ids[0].acc_holder_name or False,
+                #                          'Details': self.bank_ids[0].bank_id.name or False}
 
             final_list.append(dict)
             final_dict.update({'Contacts': final_list})
@@ -262,75 +295,77 @@ class Customer(models.Model):
 
     def get_head(self):
         xero_config = self.env['res.users'].search([('id', '=', self._uid)], limit=1).company_id
-        client_id=xero_config.xero_client_id
-        client_secret=xero_config.xero_client_secret
+        client_id = xero_config.xero_client_id
+        client_secret = xero_config.xero_client_secret
 
         data = client_id + ":" + client_secret
         encodedBytes = base64.b64encode(data.encode("utf-8"))
         encodedStr = str(encodedBytes, "utf-8")
         headers = {
             'Authorization': "Bearer " + str(xero_config.xero_oauth_token),
-            'Xero-tenant-id' : xero_config.xero_tenant_id,
+            'Xero-tenant-id': xero_config.xero_tenant_id,
             'Accept': 'application/json'
 
         }
         return headers
 
     @api.model
-    def create_main_customer_in_xero(self,con,xero_config):
-            if con:
-                vals = con.prepare_customer_export_dict()
-                parsed_dict = json.dumps(vals)
-                token = ''
-                if xero_config.xero_oauth_token:
-                    token = xero_config.xero_oauth_token
+    def create_main_customer_in_xero(self, con, xero_config):
+        if con:
+            vals = con.prepare_customer_export_dict()
+            parsed_dict = json.dumps(vals)
+            token = ''
+            if xero_config.xero_oauth_token:
+                token = xero_config.xero_oauth_token
 
-                if not token:
-                    raise ValidationError('Token not found,Authentication Unsuccessful Please check your connection!!')
+            if not token:
+                raise ValidationError('Token not found,Authentication Unsuccessful Please check your connection!!')
 
-                headers=self.get_head()
+            headers = self.get_head()
 
-                if token:
-                    protected_url = 'https://api.xero.com/api.xro/2.0/Contacts'
-                    data = requests.request('POST', url=protected_url, data=parsed_dict ,headers=headers)
-                    if data.status_code == 200:
-                        response_data = json.loads(data.text)
-                        if response_data.get('Contacts'):
-                                con.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
-                                _logger.info("\nExported Contact : {} {}".format(con, con.name))
-                                child_ids_all = self.search(
-                                    [('parent_id', '=', con.id), ('company_id', '=', xero_config.id)])
-                                if child_ids_all:
-                                    for child in child_ids_all:
-                                        child.xero_cust_id = ''
+            if token:
+                protected_url = 'https://api.xero.com/api.xro/2.0/Contacts'
+                data = requests.request('POST', url=protected_url, data=parsed_dict, headers=headers)
+                if data.status_code == 200:
+                    response_data = json.loads(data.text)
+                    if response_data.get('Contacts'):
+                        con.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
+                        _logger.info("\nExported Contact : {} {}".format(con, con.name))
+                        child_ids_all = self.search(
+                            [('parent_id', '=', con.id), ('company_id', '=', xero_config.id)])
+                        if child_ids_all:
+                            for child in child_ids_all:
+                                child.xero_cust_id = ''
 
-                                child_ids = self.search([('parent_id', '=', con.id),('company_id','=',xero_config.id)],limit=5)
-                                if child_ids:
-                                    for child in child_ids:
-                                        child.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
-                                        _logger.info("\nExported Sub-Contact : {} {}".format(child, child.name))
+                        child_ids = self.search([('parent_id', '=', con.id), ('company_id', '=', xero_config.id)],
+                                                limit=5)
+                        if child_ids:
+                            for child in child_ids:
+                                child.xero_cust_id = response_data.get('Contacts')[0].get('ContactID')
+                                _logger.info("\nExported Sub-Contact : {} {}".format(child, child.name))
 
-                    elif data.status_code == 400:
-                        logs = self.env['xero.error.log'].create({
-                            'transaction': 'Contact Export',
-                            'xero_error_response': data.text,
-                            'error_date': fields.datetime.now(),
-                            'record_id': con,
-                        })
-                        self._cr.commit()
-                        response_data = json.loads(data.text)
-                        if response_data:
-                            if response_data.get('Elements'):
-                                for element in response_data.get('Elements'):
-                                    if element.get('ValidationErrors'):
-                                        for err in element.get('ValidationErrors'):
-                                            raise ValidationError('(Contacts) Xero Exception : ' + err.get('Message'))
-                            elif response_data.get('Message'):
-                                raise ValidationError(
-                                    '(Contacts) Xero Exception : ' + response_data.get('Message'))
-                            else:
-                                raise ValidationError(
-                                    '(Contacts) Xero Exception : please check xero logs in odoo for more details')
+                elif data.status_code == 400:
+                    logs = self.env['xero.error.log'].create({
+                        'transaction': 'Contact Export',
+                        'xero_error_response': data.text,
+                        'error_date': fields.datetime.now(),
+                        'record_id': con,
+                    })
+                    self._cr.commit()
+                    response_data = json.loads(data.text)
+                    if response_data:
+                        if response_data.get('Elements'):
+                            for element in response_data.get('Elements'):
+                                if element.get('ValidationErrors'):
+                                    for err in element.get('ValidationErrors'):
+                                        raise ValidationError('(Contacts) Xero Exception : ' + err.get('Message'))
+                        elif response_data.get('Message'):
+                            raise ValidationError(
+                                '(Contacts) Xero Exception : ' + response_data.get('Message'))
+                        else:
+                            raise ValidationError(
+                                '(Contacts) Xero Exception : please check xero logs in odoo for more details')
 
-                    elif data.status_code == 401:
-                        raise ValidationError("Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
+                elif data.status_code == 401:
+                    raise ValidationError(
+                        "Time Out.\nPlease Check Your Connection or error in application or refresh token..!!")
