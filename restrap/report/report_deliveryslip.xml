@@ -242,7 +242,7 @@
                 </div>
             </xpath>
 
-            <xpath expr="//div[@class='row mt32 mb32']" position="replace">
+            <xpath expr="//div[hasclass('row') and hasclass('mt32') and hasclass('mb32')]" position="replace">
                 <div t-if="not o.has_packages" class="row mt32 mb32">
                     <div t-if="o.origin" class="col-auto" name="div_origin">
                         <strong>Order:</strong>
@@ -262,7 +262,6 @@
             </xpath>
 
 
-
             <xpath expr="//table[@name='stock_move_line_table']/thead/tr/th[@t-if='has_hs_code']" position="after">
                 <th name="th_origin">
                     <strong>Origin</strong>
@@ -274,7 +273,7 @@
                   inherit_id="stock.stock_report_delivery_aggregated_move_lines">
             <xpath expr="//td[@name='move_line_aggregated_qty_ordered']" position="replace">
             </xpath>
-            <xpath expr="//td[@class='text-center' and @name='move_line_aggregated_quantity']" position="before">
+            <xpath expr="//td[hasclass('text-center') and @name='move_line_aggregated_quantity']" position="before">
                 <td class="text-center">
                     <span t-esc="aggregated_lines[line]['quantity'] * aggregated_lines[line]['product']['weight']"
                           t-options="{'widget': 'float', 'decimal_precision': 'Product Unit of Measure'}"/>

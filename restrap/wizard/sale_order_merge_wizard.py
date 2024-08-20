@@ -4,6 +4,7 @@ from odoo.exceptions import UserError
 
 class SaleOrderMergeWizard(models.TransientModel):
     _name = 'sale.order.merge.wizard'
+    _description = 'Wizard to Merge Sale Orders'
 
     line_ids = fields.One2many('sale.order.merge.wizard.line', 'wizard_id', string="Lines")
     order_ids = fields.Many2many('sale.order', string="Sale Orders")
@@ -68,6 +69,7 @@ class SaleOrderMergeWizard(models.TransientModel):
 
 class SaleOrderMergeWizardLine(models.TransientModel):
     _name = 'sale.order.merge.wizard.line'
+    _description = 'Line for Sale Order Merge Wizard'
 
     wizard_id = fields.Many2one('sale.order.merge.wizard', string="Wizard")
     product_id = fields.Many2one('product.product', string="Product", required=True)

@@ -15,7 +15,7 @@ class MrpProduction(models.Model):
 
     allow_mrp_split = fields.Boolean("Split allowed?", related="company_id.mrp_split")
     mrp_split_done = fields.Boolean("Split Done?", copy=False)
-    reference = fields.Selection([('a', 'A'), ('b', 'B'), ('c', 'C')], string="Reference")
+    reference = fields.Selection([('a', 'A'), ('b', 'B'), ('c', 'C')], string="References")
     planned_week = fields.Char("Planned Week", compute='_calculate_week_of_planned_date', store=True)
 
     @api.depends('date_start')

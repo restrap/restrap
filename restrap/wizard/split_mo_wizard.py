@@ -3,6 +3,7 @@ from odoo import api, fields, models
 
 class MrpSplitConfirmationWizard(models.TransientModel):
     _name = 'mrp.production.split.wizard'
+    _description = 'Mrp Production Split Wizard'
 
     def action_confirm(self):
         active_ids = self._context.get('active_ids', [])

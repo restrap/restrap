@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Restrap Module",
-    "version": "17.0.1.3",
+    "version": "17.0.1.5",
     "author": "Smart IT Ltd",
     "category": "Other",
     "summary": "Restrap Smart IT Developments",
@@ -26,7 +26,6 @@
         'report/report_templates.xml',
         'report/stock_report_views.xml',
         'report/product_template_extended.xml',
-        'views/product_views.xml',
         'views/mrp_routing_workcenter_views.xml',
         'views/res_company_views.xml',
         'views/sale_order_report.xml',
