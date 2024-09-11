@@ -99,6 +99,9 @@ class ResPartner(models.Model):
         try:
             url = 'https://api.zippopotam.us/' + country_code + '/' + zip_code.split('-')[0]
             response = requests.get(url)
+            if response.status_code != '200':
+                url = 'https://api.zippopotam.us/' + country_code + '/' + zip_code.split(' ')[0]
+                response = requests.get(url)
             response = ast.literal_eval(response.content.decode('utf-8'))
         except Exception as error:
             logger.info("Error when a request for state: %s", error)
