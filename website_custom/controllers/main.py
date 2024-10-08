@@ -25,14 +25,13 @@ class PaymentControllenedfr(http.Controller):
         if main_product:
             product_s = request.env['product.template.attribute.value'].search([('id', '=', main_product)])
             stock2 = request.env['product.product'].search([('product_template_variant_value_ids', '=', product_s.id)])
-            stock3 = request.env['stock.quant'].search([('product_id', '=', stock2.id)])
-            qty2 = stock2.free_qty
-            #for stock34 in stock3:
-                #if website.warehouse_id.view_location_id == stock34.location_id.location_id:
-                    #print("product_free_qtytttttttttttttttt",stock2.free_qty)
-                    #qty2 = stock2.free_qty
-                    #qty2 = stock34.inventory_quantity_auto_apply - stock34.reserved_quantity
-                    #print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&777",stock34.inventory_quantity_auto_apply - stock34.reserved_quantity)
+            stock3 = request.env['stock.quant'].search([('product_id', '=', stock2.id),('location_id', '=', website.warehouse_id.lot_stock_id.id)])
+            #qty2 = stock2.free_qty
+            if stock3:
+                for stock34 in stock3:
+                    qty2 = stock34.inventory_quantity_auto_apply - stock34.reserved_quantity
+            else:
+                qty2 = 0
                 
 
         if qty2 <= 0 and response_data != True:
