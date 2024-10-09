@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+  <record id="website_view_form_custom" model="ir.ui.view">
+        <field name="name">website.form.view</field>
+        <field name="model">website</field>
+        <field name="inherit_id" ref="website.view_website_form"/>
+        <field name="arch" type="xml">
+                <xpath expr="//field[@name='name']" position="after">
+                    <field name="allow_out_of_stock_order"/>
+                    <field name="website_suffix"/>
+                </xpath>
+               
+            </field>
+        </record>
+        
+        <record id="view_res_config_settings_form_inherit" model="ir.ui.view">
+            <field name="name">res.config.settings.form.inherit</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="website_sale_stock.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='allow_out_of_stock_order']" position="attributes">
+                    <attribute name="readonly">1</attribute>
+                </xpath>
+            </field>
+        </record>
+        
+        <odoo>
+    <data noupdate="1">
+        <record id="access_stock_warehouse_public" model="ir.model.access">
+            <field name="name">Access Stock Warehouse Public</field>
+            <field name="model_id" ref="stock.model_stock_warehouse"/>
+            <field name="group_id" ref="base.group_public"/>  <!-- Public group -->
+            <field name="perm_read" eval="1"/>  <!-- Allow read access -->
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+    </data>
+</odoo>
+</odoo>
+
