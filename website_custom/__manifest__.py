@@ -1,6 +1,6 @@
 {
     'name': 'Website Custom',
-    'version': '17.6',
+    'version': '17.7',
     'author': 'Pragmatic TechSoft Pvt Ltd.',
     'website': 'http://www.pragtech.co.in',
     'category': 'Website',
